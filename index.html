@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Las Mareas de Jone</title>
+<meta name="theme-color" content="#0b0f1a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mareas">
+<style>
+  :root{
+    /* --- modo noche (por defecto) --- */
+    --bg:#0b0f1a;
+    --bg-header:#0d1120;
+    --curve-card:#160c14;
+    --panel-astro:#11162a;
+    --panel-now:#160b0b;
+    --red:#ff6b6b;
+    --green:#4bd67a;
+    --white:#f2f4f8;
+    --muted:#8b93a7;
+    --line:#2a3350;
+    --curve-stroke:#7d8aa8;
+    --switch-track:#2a3350;
+    --switch-thumb:#f2f4f8;
+  }
+  body.day-mode{
+    /* --- modo día --- */
+    --bg:#dff1fb;
+    --bg-header:#bfe3f6;
+    --curve-card:#eaf7ff;
+    --panel-astro:#ffffff;
+    --panel-now:#fff4ec;
+    --red:#e0524a;
+    --green:#1f9e5c;
+    --white:#173047;
+    --muted:#5b7286;
+    --line:#bcdcee;
+    --curve-stroke:#4a7a97;
+    --switch-track:#a9d8ef;
+    --switch-thumb:#ffffff;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    overflow:hidden; transition:background .35s ease, color .35s ease;}
+  #app{display:flex;flex-direction:column;height:100vh;height:100dvh;
+    padding-bottom:env(safe-area-inset-bottom);overflow:hidden;}
+
+  header{
+    flex:0 0 auto;
+    display:flex;flex-direction:column;gap:4px;
+    padding:calc(12px + env(safe-area-inset-top)) 16px 12px 16px;
+    background:var(--bg-header); transition:background .35s ease;
+  }
+  header .header-row{display:flex;align-items:center;gap:10px;}
+  header .title-emoji{font-size:1.9rem;line-height:1;flex:0 0 34px;width:34px;text-align:center;}
+  header .title{font-size:1.22rem;font-weight:800;line-height:1.2;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+
+  .switch{position:relative;width:54px;height:30px;flex:0 0 auto;}
+  .switch input{opacity:0;width:0;height:0;position:absolute;}
+  .switch .track{
+    position:absolute;inset:0;border-radius:999px;background:var(--switch-track);
+    transition:background .3s ease;cursor:pointer;
+  }
+  .switch .track::after{
+    content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;
+    background:var(--switch-thumb);transition:transform .3s ease;
+    box-shadow:0 1px 3px rgba(0,0,0,.35);
+  }
+  .switch input:checked + .track::after{ transform:translateX(24px); }
+  .switch .ico{position:absolute;top:6px;font-size:0.8rem;pointer-events:none;line-height:1;}
+  .switch .ico.moon{left:6px;}
+  .switch .ico.sun{right:6px;}
+
+  .curve-card{
+    background:var(--curve-card);
+    padding:8px 12px 4px 12px;
+    position:relative;
+    flex:0 1 34%; min-height:0;
+    display:flex; flex-direction:column;
+    transition:background .35s ease;
+  }
+  .curve-card.animating{ transition:background .35s ease, transform .22s ease, opacity .22s ease; }
+  .extremes-row{
+    flex:0 0 auto;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:0 4px;margin-bottom:2px;
+  }
+  .panel-date-title{text-align:center;line-height:1.3;margin-bottom:28px;}
+  .panel-date-title .date-line1{font-size:1.18rem;font-weight:800;color:var(--white);}
+  .panel-date-title .date-line2{font-size:0.85rem;font-weight:600;color:var(--muted);}
+  .extreme{line-height:1.1;}
+  .extreme.right{text-align:right;}
+  .extreme .time{font-size:1.45rem;font-weight:800;}
+  .extreme .label{font-size:0.85rem;font-weight:700;}
+  .extreme .height{font-size:0.88rem;font-weight:700;color:var(--muted);}
+  .extreme.high .time, .extreme.high .label{color:var(--red);}
+  .extreme.low .time, .extreme.low .label{color:var(--green);}
+
+  .curve-wrap{flex:1 1 auto; min-height:0; position:relative; touch-action:none;}
+  svg#curve{width:100%;height:100%;display:block;touch-action:none;}
+  .mid-label{
+    position:absolute;font-size:0.8rem;font-weight:700;
+    text-align:center;line-height:1.15;pointer-events:none;
+  }
+  .mid-label .time{font-size:1.15rem;font-weight:800;display:block;}
+  .mid-label .height{font-size:0.82rem;font-weight:700;color:var(--muted);display:block;}
+  .mid-label.low .time, .mid-label.low .label{color:var(--green);}
+  .mid-label.high .time, .mid-label.high .label{color:var(--red);}
+
+  .now-label{
+    position:absolute;font-size:0.78rem;font-weight:700;color:var(--white);
+    text-align:center;line-height:1.15;pointer-events:none;white-space:nowrap;
+  }
+  .now-label .time{font-size:1.05rem;font-weight:800;display:block;}
+  .now-label .height{font-size:0.8rem;font-weight:700;color:var(--muted);display:block;}
+
+  .hours{flex:0 0 auto;display:flex;justify-content:space-between;padding:0 2px;
+    color:var(--muted);font-size:0.68rem;margin-top:1px;}
+
+  .grid{flex:1 1 auto;display:flex;min-height:0;}
+  .panel{padding:14px 18px;display:flex;flex-direction:column;justify-content:center;position:relative;min-height:0;overflow:hidden;}
+  .panel.astro{background:var(--panel-astro);flex:1.5 1 0;}
+  .panel.gauge{background:var(--panel-now);flex:1 1 0;align-items:center;gap:8px;border-left:1px solid var(--line);touch-action:none;}
+  .panel, .grid{transition:background .35s ease, border-color .35s ease;}
+
+  #gaugeSvg{width:96px;height:auto;display:block;max-height:100%;}
+  #gaugeFill{transition:d .25s ease;}
+  .gauge-tank-wrap{position:relative;flex:0 0 auto;}
+  .gauge-max{font-size:0.92rem;font-weight:800;color:var(--red);}
+  .gauge-min{font-size:0.92rem;font-weight:800;color:var(--green);}
+  .gauge-current{
+    position:absolute;left:50%;font-size:0.72rem;font-weight:800;color:var(--white);
+    background:var(--bg-header);padding:1px 6px;border-radius:8px;white-space:nowrap;
+    transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+
+  .astro-line{display:flex;align-items:center;gap:9px;font-size:1.08rem;font-weight:700;margin-bottom:4px;}
+  .astro-line .ico{font-size:1.1rem;}
+  .astro-line.temp-group{margin-top:10px;}
+  .astro-line.sun-group{margin-top:10px;}
+  .astro-line.moon{margin-top:12px;}
+  .daylight{font-size:0.85rem;color:var(--muted);margin-bottom:3px;}
+  .moon-event{font-size:0.74rem;color:var(--muted);line-height:1.4;}
+
+  .navbar{
+    flex:0 0 auto;
+    display:flex;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    background:var(--bg-header);
+    transition:background .35s ease, border-color .35s ease;
+  }
+  .navbar button{
+    flex:1;background:none;border:none;color:var(--muted);
+    padding:7px 2px;font-size:0.62rem;display:flex;flex-direction:column;
+    align-items:center;gap:2px;
+  }
+  .navbar button .ico{font-size:1rem;}
+  .navbar button:active{opacity:0.6;}
+
+  .status-badge{
+    margin-top:14px;align-self:flex-start;font-size:0.68rem;color:var(--muted);
+    background:#00000022;padding:3px 9px;border-radius:8px;letter-spacing:.03em;
+    display:none;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="header-row">
+      <div class="title-emoji">🌊</div>
+      <div class="title">Las Mareas de Jone</div>
+      <label class="switch" id="themeSwitch" aria-label="Cambiar modo día/noche">
+        <input type="checkbox" id="themeCheckbox">
+        <span class="track"></span>
+        <span class="ico moon">🌙</span>
+        <span class="ico sun">☀️</span>
+      </label>
+    </div>
+  </header>
+
+  <div class="curve-card">
+    <div class="extremes-row">
+      <div class="extreme" id="firstExtreme">
+        <div class="time">--:--</div>
+        <div class="label">--</div>
+        <div class="height">--m</div>
+      </div>
+      <div class="extreme right" id="lastExtreme">
+        <div class="time">--:--</div>
+        <div class="label">--</div>
+        <div class="height">--m</div>
+      </div>
+    </div>
+    <div class="curve-wrap">
+      <svg id="curve"></svg>
+      <div id="midLabels"></div>
+    </div>
+    <div class="hours" id="hoursRow"></div>
+  </div>
+
+  <div class="navbar">
+    <button id="prev24Btn"><span class="ico">⟪</span>-24h</button>
+    <button id="prevBtn"><span class="ico">←</span>-12h</button>
+    <button id="nowBtn"><span class="ico">●</span>Ahora</button>
+    <button id="nextBtn"><span class="ico">→</span>+12h</button>
+    <button id="next24Btn"><span class="ico">⟫</span>+24h</button>
+  </div>
+
+  <div class="grid">
+    <div class="panel astro">
+      <div class="panel-date-title" id="dateLabel">
+        <div class="date-line1" id="dateLine1">--</div>
+        <div class="date-line2" id="dateLine2">--</div>
+      </div>
+      <div class="astro-line springneap"><span class="ico" id="springNeapIcon">〰️</span><span id="springNeapLabel">--</span></div>
+      <div class="astro-line temp-group"><span class="ico">🌡️</span><span id="waterTemp">--°C de agua</span></div>
+      <div class="astro-line sun-group"><span class="ico">☀️</span><span id="sunTimes">--:-- → --:--</span></div>
+      <div class="daylight" id="daylightHours">-- de luz</div>
+      <div class="daylight" id="nightHours">-- de noche</div>
+      <div class="astro-line moon"><span class="ico" id="moonIcon">🌘</span><span id="moonPhaseName">--</span></div>
+      <div class="moon-event" id="prevMoonEvent">Anterior: --</div>
+      <div class="moon-event" id="nextMoonEvent">Próxima: --</div>
+      <span class="status-badge" id="statusBadge">cargando…</span>
+    </div>
+    <div class="panel gauge">
+      <div class="gauge-max" id="gaugeMax">--m</div>
+      <div class="gauge-tank-wrap">
+        <svg id="gaugeSvg" viewBox="0 0 80 164" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <clipPath id="gaugeClip"><rect x="6" y="6" width="68" height="152" rx="16"/></clipPath>
+          </defs>
+          <rect x="6" y="6" width="68" height="152" rx="16" fill="none" stroke="var(--line)" stroke-width="2.5"/>
+          <g clip-path="url(#gaugeClip)">
+            <path id="gaugeFill" d="" fill="var(--curve-stroke)" opacity="0.85"/>
+          </g>
+        </svg>
+        <div class="gauge-current" id="gaugeCurrent">--m</div>
+      </div>
+      <div class="gauge-min" id="gaugeMin">--m</div>
+    </div>
+  </div>
+
+
+</div>
+
+<script>
+/* =========================================================================
+   LAS MAREAS DE JONE — v0.3 (datos reales vía Open-Meteo Marine API + modo día/noche)
+   -------------------------------------------------------------------------
+   FUENTE DE DATOS: https://open-meteo.com/en/docs/marine-weather-api
+   Gratis, sin API key, hasta 10.000 llamadas/día para uso no comercial.
+   Da altura del mar (sea_level_height_msl) HORA A HORA; las pleamares y
+   bajamares se detectan localmente como máximos/mínimos de esa serie
+   (función detectExtremes). Se cachea en localStorage 3h.
+
+   AVISO: el modelo tiene resolución ~8km y en la ría de Bilbao puede
+   desviarse algo del dato oficial del puerto. Válido para uso personal.
+   ========================================================================= */
+
+// Punto en el mar frente a Bilbao (necesario porque la API marina solo da datos sobre agua)
+const MARINE_LAT = 43.353, MARINE_LON = -3.049;
+const LAT = 43.353, LON = -3.049; // mismo punto para el cálculo de amanecer/ocaso
+const CACHE_KEY = "mareasBilbao_seriesCache_v2";
+// Open-Meteo mide la altura del mar respecto al nivel medio del mar (MSL), no
+// respecto al cero del puerto (dato de reducción de sondas) que usa la tabla
+// oficial del IHM (Instituto Hidrográfico de la Marina). Para que, en caso de tener que usar Open-Meteo
+// como reserva, las cifras salgan en el mismo rango que la tabla del puerto
+// (en vez de rondar 0m o negativas), se suma esta corrección aproximada.
+// OJO: es una aproximación (~2.4m, típica en esta zona) para que el número se
+// lea en el rango correcto — no es una conversión oficial exacta de datum.
+const OPENMETEO_DATUM_OFFSET = 2.4;
+const CACHE_MAX_AGE_MS = 3 * 60 * 60 * 1000; // 3h
+const THEME_KEY = "mareasBilbao_theme";
+
+// ---- estado ----
+// En vez de "día calendario", navegamos con un desplazamiento continuo en horas
+// respecto al instante real (para poder movernos ±12h con botones o swipe).
+let manualOffsetHours = 0;   // desplazamiento acumulado por navegación (±12h por paso)
+let manualTime = null;       // instante exacto arrastrado a mano sobre la curva (null = seguir el marcador automático)
+let cachedSeries = null;
+let cachedTempSeries = null;
+let geom = null;             // última geometría calculada de la curva (para arrastrar el punto)
+let dotPixel = null;         // última posición en píxeles del punto (para detectar el toque sobre él)
+
+function currentRefTime(){
+  return new Date(Date.now() + manualOffsetHours*3600000);
+}
+
+// ---------------------------------------------------------------------
+// MODO DÍA / NOCHE
+// ---------------------------------------------------------------------
+function applyTheme(mode){
+  document.body.classList.toggle('day-mode', mode === 'day');
+  document.getElementById('themeCheckbox').checked = (mode === 'day');
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  metaTheme.setAttribute('content', mode === 'day' ? '#bfe3f6' : '#0b0f1a');
+  try{ localStorage.setItem(THEME_KEY, mode); }catch(e){}
+}
+document.getElementById('themeCheckbox').addEventListener('change', (e)=>{
+  applyTheme(e.target.checked ? 'day' : 'night');
+});
+(function initTheme(){
+  let saved = null;
+  try{ saved = localStorage.getItem(THEME_KEY); }catch(e){}
+  applyTheme(saved === 'night' ? 'night' : 'day');
+})();
+
+// ---------------------------------------------------------------------
+// DATOS DE MAREA — Open-Meteo Marine API
+// ---------------------------------------------------------------------
+async function fetchTideSeries(){
+  try{
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    if(cached && cached.tempSeries && (Date.now()-cached.fetchedAt) < CACHE_MAX_AGE_MS){
+      return {
+        series: cached.series.map(p=>({ time: new Date(p.time), height: p.height })),
+        tempSeries: cached.tempSeries.map(p=>({ time: new Date(p.time), temp: p.temp }))
+      };
+    }
+  }catch(e){/* caché corrupta, ignorar */}
+
+  const url = `https://marine-api.open-meteo.com/v1/marine`
+    + `?latitude=${MARINE_LAT}&longitude=${MARINE_LON}`
+    + `&hourly=sea_level_height_msl,sea_surface_temperature`
+    + `&timezone=Europe%2FMadrid`
+    + `&past_days=1&forecast_days=3`;
+
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Open-Meteo marine API error " + res.status);
+  const data = await res.json();
+  const times = data.hourly.time;
+  const heights = data.hourly.sea_level_height_msl;
+  const temps = data.hourly.sea_surface_temperature || [];
+  const series = times.map((t,i)=>({ time: new Date(t), height: heights[i]!=null ? heights[i]+OPENMETEO_DATUM_OFFSET : null }))
+                       .filter(p=>p.height!=null);
+  const tempSeries = times.map((t,i)=>({ time: new Date(t), temp: temps[i] }))
+                           .filter(p=>p.temp!=null);
+
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      fetchedAt: Date.now(),
+      series: series.map(p=>({ time: p.time.toISOString(), height: p.height })),
+      tempSeries: tempSeries.map(p=>({ time: p.time.toISOString(), temp: p.temp }))
+    }));
+  }catch(e){/* localStorage lleno o no disponible */}
+
+  return { series, tempSeries };
+}
+
+// Temperatura del agua interpolada linealmente entre las dos lecturas horarias más cercanas
+function tempAt(date, tempSeries){
+  if(!tempSeries || tempSeries.length===0) return null;
+  for(let i=0;i<tempSeries.length-1;i++){
+    const a = tempSeries[i], b = tempSeries[i+1];
+    if(date >= a.time && date <= b.time){
+      const frac = (date.getTime()-a.time.getTime())/(b.time.getTime()-a.time.getTime());
+      return a.temp + (b.temp-a.temp)*frac;
+    }
+  }
+  // fuera de rango: usamos el extremo más cercano en vez de no mostrar nada
+  return date < tempSeries[0].time ? tempSeries[0].temp : tempSeries[tempSeries.length-1].temp;
+}
+
+// ---------------------------------------------------------------------
+// DATOS DE MAREA — fuente oficial (Autoridad Portuaria de Bilbao, vía una
+// Netlify Function que consulta la API del IHM: ideihm.covam.es)
+// Estos SÍ son las pleamares/bajamares reales (no una aproximación de modelo).
+// ---------------------------------------------------------------------
+const CACHE_KEY_OFICIAL = "mareasBilbao_oficialCache_v1";
+
+async function fetchOfficialExtremes(){
+  try{
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY_OFICIAL) || "null");
+    if(cached && (Date.now()-cached.fetchedAt) < CACHE_MAX_AGE_MS){
+      return cached.extremes.map(p=>({ time: new Date(p.time), height: p.height, type: p.type }));
+    }
+  }catch(e){/* caché corrupta, ignorar */}
+
+  const res = await fetch('/.netlify/functions/mareas');
+  if(!res.ok) throw new Error("Función de mareas oficiales falló: " + res.status);
+  const data = await res.json();
+  if(!data.extremes || data.extremes.length===0) throw new Error("Sin datos oficiales en la respuesta");
+  const extremes = data.extremes.map(p=>({ time: new Date(p.time), height: p.height, type: p.type }));
+
+  try{
+    localStorage.setItem(CACHE_KEY_OFICIAL, JSON.stringify({
+      fetchedAt: Date.now(),
+      extremes: extremes.map(p=>({ time: p.time.toISOString(), height: p.height, type: p.type }))
+    }));
+  }catch(e){/* localStorage lleno o no disponible */}
+
+  return extremes;
+}
+
+// Orquesta ambas fuentes: intenta primero los datos oficiales del puerto (precisos);
+// si fallan (red, función no desplegada, cambio en la web), usa Open-Meteo como
+// reserva. La temperatura del agua siempre viene de Open-Meteo (el puerto no la publica).
+let dataSource = null; // 'oficial' | 'openmeteo'
+
+async function loadTideData(){
+  const [omResult, officialResult] = await Promise.allSettled([fetchTideSeries(), fetchOfficialExtremes()]);
+
+  cachedTempSeries = (omResult.status === 'fulfilled') ? omResult.value.tempSeries : null;
+
+  if(officialResult.status === 'fulfilled'){
+    cachedSeries = officialResult.value;
+    dataSource = 'oficial';
+  } else if(omResult.status === 'fulfilled'){
+    console.warn('Datos oficiales no disponibles, usando Open-Meteo de reserva:', officialResult.reason);
+    cachedSeries = omResult.value.series;
+    dataSource = 'openmeteo';
+  } else {
+    throw new Error('Ambas fuentes de datos de marea fallaron');
+  }
+}
+
+function detectExtremes(series){
+  // Si la serie ya viene con "type" (datos oficiales del IHM, que ya
+  // son pleamares/bajamares reales), la devolvemos tal cual sin recalcular nada.
+  if(series.length>0 && series[0].type){
+    return series;
+  }
+  const extremes = [];
+  for(let i=1;i<series.length-1;i++){
+    const prev=series[i-1].height, cur=series[i].height, next=series[i+1].height;
+    if(cur>prev && cur>=next) extremes.push({ time: series[i].time, height: cur, type: "high" });
+    else if(cur<prev && cur<=next) extremes.push({ time: series[i].time, height: cur, type: "low" });
+  }
+  return extremes;
+}
+
+function heightAt(date, series){
+  for(let i=0;i<series.length-1;i++){
+    const a = series[i], b = series[i+1];
+    if(date >= a.time && date <= b.time){
+      const t1=a.time.getTime(), t2=b.time.getTime();
+      const frac = (date.getTime()-t1)/(t2-t1);
+      return a.height + (b.height-a.height)/2 * (1-Math.cos(Math.PI*frac));
+    }
+  }
+  return null;
+}
+
+// Suaviza ligeramente la serie SOLO para dibujar la línea de la curva (filtro de
+// media ponderada 1-4-6-4-1). Las pleamares/bajamares y las cifras mostradas
+// siguen calculándose sobre los datos reales (series), sin suavizar, para que
+// las alturas exactas no cambien — esto solo afina el trazo visualmente.
+function smoothSeriesForDrawing(series){
+  const kernel = [1,4,6,4,1];
+  return series.map((p,i)=>{
+    let sum=0, wsum=0;
+    for(let k=-2;k<=2;k++){
+      const idx = i+k;
+      if(idx<0 || idx>=series.length) continue;
+      const w = kernel[k+2];
+      sum += series[idx].height*w;
+      wsum += w;
+    }
+    return { time: p.time, height: sum/wsum };
+  });
+}
+
+function trendAt(date, series){
+  const h1 = heightAt(new Date(date.getTime()-2*60000), series);
+  const h2 = heightAt(new Date(date.getTime()+2*60000), series);
+  if(h1==null||h2==null) return "—";
+  return h2>h1 ? "subiendo" : "bajando";
+}
+
+// Busca, dentro de un tramo monótono [segStart, segEnd] (solo sube o solo baja),
+// el instante donde la altura coincide con targetHeight. Usado por el arrastre
+// vertical del cuadrante: al no ser la marea invertible en toda la ventana (sube
+// y luego baja, o al revés), se resuelve dentro del tramo en el que ya estaba el
+// marcador al empezar el gesto, para que el movimiento sea coherente.
+// ---------------------------------------------------------------------
+// AMANECER / OCASO (algoritmo NOAA simplificado, sin API)
+// ---------------------------------------------------------------------
+function sunTimesFor(date, lat, lon){
+  function calc(isSunrise){
+    const zenith = 90.833;
+    const N = Math.floor((date - new Date(date.getFullYear(),0,0))/86400000);
+    const lngHour = lon/15;
+    const t = N + ((isSunrise?6:18) - lngHour)/24;
+    const M = (0.9856*t) - 3.289;
+    let L = M + (1.916*Math.sin(M*Math.PI/180)) + (0.020*Math.sin(2*M*Math.PI/180)) + 282.634;
+    L = (L+360)%360;
+    let RA = (180/Math.PI)*Math.atan(0.91764*Math.tan(L*Math.PI/180));
+    RA = (RA+360)%360;
+    const Lq = Math.floor(L/90)*90;
+    const RAq = Math.floor(RA/90)*90;
+    RA = RA + (Lq-RAq);
+    RA = RA/15;
+    const sinDec = 0.39782*Math.sin(L*Math.PI/180);
+    const cosDec = Math.cos(Math.asin(sinDec));
+    const cosH = (Math.cos(zenith*Math.PI/180) - (sinDec*Math.sin(lat*Math.PI/180))) / (cosDec*Math.cos(lat*Math.PI/180));
+    if(cosH>1||cosH<-1) return null;
+    let H = isSunrise ? 360-(180/Math.PI)*Math.acos(cosH) : (180/Math.PI)*Math.acos(cosH);
+    H = H/15;
+    const T = H + RA - (0.06571*t) - 6.622;
+    return (T - lngHour + 24)%24;
+  }
+  const sr = calc(true), ss = calc(false);
+  function toLocal(utHours){
+    if(utHours==null) return null;
+    const d = new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate(),0,0,0));
+    d.setUTCMinutes(d.getUTCMinutes() + utHours*60);
+    return d;
+  }
+  return { sunrise: toLocal(sr), sunset: toLocal(ss) };
+}
+
+function fmtTime(d){
+  if(!d) return "--:--";
+  return d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+}
+function fmtDate(d){
+  const weekday = d.toLocaleDateString('es-ES',{weekday:'long'});
+  const rest = d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}).replace('.','');
+  return weekday + ' ' + rest;
+}
+function fmtDuration(sunrise, sunset){
+  if(!sunrise||!sunset) return "-- de luz";
+  const mins = Math.round((sunset-sunrise)/60000);
+  const h = Math.floor(mins/60), m = mins%60;
+  return `${h}h ${m}m de luz`;
+}
+function fmtNightDuration(sunrise, sunset){
+  if(!sunrise||!sunset) return "-- de noche";
+  const dayMins = Math.round((sunset-sunrise)/60000);
+  const nightMins = 24*60 - dayMins;
+  const h = Math.floor(nightMins/60), m = nightMins%60;
+  return `${h}h ${m}m de noche`;
+}
+
+// ---------------------------------------------------------------------
+// FASE LUNAR (algoritmo astronómico estándar, sin API)
+// ---------------------------------------------------------------------
+const SYNODIC_MONTH_DAYS = 29.530588853;
+const KNOWN_NEW_MOON = Date.UTC(2000,0,6,18,14,0); // luna nueva de referencia conocida
+
+const MOON_PHASES = [
+  { max: 1.84566,  name: "Luna nueva",        icon: "🌑" },
+  { max: 5.53699,  name: "Creciente",         icon: "🌒" },
+  { max: 9.22831,  name: "Cuarto creciente",  icon: "🌓" },
+  { max: 12.91963, name: "Gibosa creciente",  icon: "🌔" },
+  { max: 16.61096, name: "Luna llena",        icon: "🌕" },
+  { max: 20.30228, name: "Gibosa menguante",  icon: "🌖" },
+  { max: 23.99361, name: "Cuarto menguante",  icon: "🌗" },
+  { max: 27.68493, name: "Menguante",         icon: "🌘" },
+  { max: SYNODIC_MONTH_DAYS, name: "Luna nueva", icon: "🌑" }
+];
+
+function moonInfo(date){
+  const diffDays = (date.getTime() - KNOWN_NEW_MOON) / 86400000;
+  const age = ((diffDays % SYNODIC_MONTH_DAYS) + SYNODIC_MONTH_DAYS) % SYNODIC_MONTH_DAYS;
+  const phase = MOON_PHASES.find(p => age <= p.max) || MOON_PHASES[0];
+
+  const lastNewMoonMs = date.getTime() - age*86400000;
+  const halfMonthMs = (SYNODIC_MONTH_DAYS/2)*86400000;
+  const monthMs = SYNODIC_MONTH_DAYS*86400000;
+
+  const candidates = [
+    { t: lastNewMoonMs - halfMonthMs, type: "full" },
+    { t: lastNewMoonMs,               type: "new"  },
+    { t: lastNewMoonMs + halfMonthMs, type: "full" },
+    { t: lastNewMoonMs + monthMs,     type: "new"  }
+  ].sort((a,b)=>a.t-b.t);
+
+  const now = date.getTime();
+  let prevEvent = candidates[0], nextEvent = candidates[candidates.length-1];
+  for(const c of candidates){
+    if(c.t <= now) prevEvent = c;
+    if(c.t > now){ nextEvent = c; break; }
+  }
+
+  return {
+    name: phase.name,
+    icon: phase.icon,
+    prevEvent: { type: prevEvent.type, date: new Date(prevEvent.t) },
+    nextEvent: { type: nextEvent.type, date: new Date(nextEvent.t) },
+    springNeap: springNeapInfo(age)
+  };
+}
+
+// Mareas vivas (springs) ocurren cerca de luna nueva/llena; mareas muertas
+// (neaps) cerca de los cuartos. cos(2·ángulo del ciclo lunar) da +1 en
+// nueva/llena y -1 en los cuartos, con transición suave entre medias.
+function springNeapInfo(ageDays){
+  const theta = (ageDays / SYNODIC_MONTH_DAYS) * 2 * Math.PI;
+  const index = Math.cos(2*theta); // -1 (muertas) .. +1 (vivas)
+  if(index > 0.5) return { label: "Mareas vivas", icon: "🌊" };
+  if(index < -0.5) return { label: "Mareas muertas", icon: "🌫️" };
+  return { label: "Mareas intermedias", icon: "〰️" };
+}
+
+function fmtMoonEventLabel(type){ return type === 'full' ? 'Luna llena' : 'Luna nueva'; }
+function fmtEventDateTime(d){
+  const datePart = d.toLocaleDateString('es-ES',{day:'2-digit',month:'short'}).replace('.','');
+  return `${datePart}, ${fmtTime(d)}`;
+}
+
+// ---------------------------------------------------------------------
+// DIBUJO DE LA CURVA SVG
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// CUADRANTE DE NIVEL (SVG) — un pequeño "depósito" que se llena o vacía
+// según la marea, en la MISMA escala (hMin/hMax) que usa la curva principal,
+// para que sea coherente con lo que se ve arriba.
+// ---------------------------------------------------------------------
+function updateGauge(height, hMin, hMax, windowHigh, windowLow){
+  const fillEl = document.getElementById('gaugeFill');
+  const currentEl = document.getElementById('gaugeCurrent');
+  const maxEl = document.getElementById('gaugeMax');
+  const minEl = document.getElementById('gaugeMin');
+
+  maxEl.textContent = windowHigh!=null ? windowHigh.toFixed(2)+'m' : '--m';
+  minEl.textContent = windowLow!=null ? windowLow.toFixed(2)+'m' : '--m';
+
+  if(height==null || hMin==null || hMax==null || hMax<=hMin){
+    fillEl.setAttribute('d','');
+    currentEl.style.display = 'none';
+    return;
+  }
+  const frac = Math.max(0, Math.min(1, (height-hMin)/(hMax-hMin)));
+  const top = 6, bottom = 158, left = 6, right = 74; // coordenadas del tanque (viewBox 80x164)
+  const waterY = bottom - frac*(bottom-top);
+  const wave = 5; // altura de la cresta ondulada de la superficie
+  const w = right-left;
+  const d = `M${left},${waterY} `
+    + `C${left+w*0.25},${waterY-wave} ${left+w*0.25},${waterY+wave} ${left+w*0.5},${waterY} `
+    + `C${left+w*0.75},${waterY-wave} ${left+w*0.75},${waterY+wave} ${right},${waterY} `
+    + `L${right},${bottom} L${left},${bottom} Z`;
+  fillEl.setAttribute('d', d);
+
+  // La cifra actual flota justo sobre la línea de agua, dentro del propio tanque
+  // (así no compite por sitio con el máximo/mínimo, que van fuera, arriba y abajo).
+  currentEl.style.display = 'block';
+  currentEl.style.top = (waterY/164*100).toFixed(1) + '%';
+  currentEl.textContent = height.toFixed(2) + 'm';
+}
+
+function drawCurve(series){
+  const svg = document.getElementById('curve');
+  const midLabels = document.getElementById('midLabels');
+  midLabels.innerHTML = "";
+
+  // Medimos el contenedor real en píxeles y usamos ESE tamaño como viewBox
+  // (1 unidad = 1 píxel en ambos ejes). Antes el viewBox era fijo (1000x230)
+  // y se estiraba de forma no uniforme al tamaño real, lo que deformaba el
+  // grosor del trazo en cada segmento y daba ese efecto "escalonado".
+  const wrapRect = document.querySelector('.curve-wrap').getBoundingClientRect();
+  const W = Math.max(200, Math.round(wrapRect.width));
+  const H = Math.max(80, Math.round(wrapRect.height));
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const PAD_TOP = H*0.22, PAD_BOT = H*0.26;
+
+  const extremes = detectExtremes(series);
+  if(extremes.length < 2){ geom = null; return; } // sin datos suficientes, no dibujamos nada
+
+  // Ventana = exactamente 3 mareas consecutivas (2 altas+1 baja o 2 bajas+1 alta).
+  // Si se está arrastrando el marcador a mano, la ventana LO SIGUE (para que al
+  // salir por un borde, arrastrando, se avance de forma natural a la siguiente
+  // ventana en vez de quedarse atascado). Si no, se centra en la referencia de
+  // navegación normal (±12h/±24h por botón o el instante real actual).
+  const reference = manualTime || currentRefTime();
+
+  let idx = 0;
+  for(let i=0;i<extremes.length;i++){
+    if(extremes[i].time <= reference) idx = i; else break;
+  }
+  if(idx > extremes.length-3) idx = Math.max(0, extremes.length-3);
+  const relevant = extremes.slice(idx, Math.min(idx+3, extremes.length));
+
+  const winStart = relevant[0].time;
+  const winEnd   = relevant[relevant.length-1].time;
+  const allHeights = relevant.map(e=>e.height);
+  const windowHigh = Math.max(...allHeights), windowLow = Math.min(...allHeights);
+  const hMin = windowLow-0.3, hMax = windowHigh+0.3;
+
+  function x(t){ return (t-winStart.getTime())/(winEnd.getTime()-winStart.getTime())*W; }
+  function y(h){ return PAD_TOP + (H-PAD_TOP-PAD_BOT)*(1-(h-hMin)/(hMax-hMin)); }
+  function xInv(px){ return new Date(winStart.getTime() + (px/W)*(winEnd.getTime()-winStart.getTime())); }
+
+  // guardamos la geometría para poder invertir toques/arrastres sobre la curva
+  geom = { winStart, winEnd, W, H, x, y, xInv, series, hMin, hMax };
+
+  // Puntos muestreados cada 5 min sobre la serie SUAVIZADA, convertidos a una
+  // curva suave (Catmull-Rom -> Bézier) en vez de segmentos rectos, para que
+  // no se aprecien ni vértices ni los pequeños altibajos del dato hora a hora.
+  // El suavizado (filtro de media ponderada) solo tiene sentido para el dato
+  // horario de Open-Meteo, que trae pequeño ruido de alta frecuencia. Los datos
+  // oficiales del puerto ya son solo pleamares/bajamares reales, sin ruido que
+  // limpiar — suavizarlos aplanaría los picos reales de la marea.
+  const smoothed = (dataSource === 'oficial') ? series : smoothSeriesForDrawing(series);
+  const pts = [];
+  const STEP_MIN = 5;
+  for(let t=winStart.getTime(); t<=winEnd.getTime(); t+=STEP_MIN*60000){
+    const dt = new Date(t);
+    const h = heightAt(dt, smoothed);
+    if(h==null) continue;
+    pts.push([x(t), y(h)]);
+  }
+  let d = "";
+  if(pts.length>0){
+    d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} `;
+    for(let i=0;i<pts.length-1;i++){
+      const p0 = pts[i-1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i+1];
+      const p3 = pts[i+2] || p2;
+      const c1x = p1[0] + (p2[0]-p0[0])/6, c1y = p1[1] + (p2[1]-p0[1])/6;
+      const c2x = p2[0] - (p3[0]-p1[0])/6, c2y = p2[1] - (p3[1]-p1[1])/6;
+      d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} `;
+    }
+  }
+
+  const strokeColor = getComputedStyle(document.body).getPropertyValue('--curve-stroke').trim() || '#7d8aa8';
+  let svgContent = `<path d="${d}" fill="none" stroke="${strokeColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  const hoursRow = document.getElementById('hoursRow');
+  hoursRow.innerHTML = "";
+  const firstTick = new Date(winStart);
+  firstTick.setMinutes(0,0,0);
+  if(firstTick < winStart) firstTick.setHours(firstTick.getHours()+1);
+  for(let t=new Date(firstTick); t<=winEnd; t.setHours(t.getHours()+1)){
+    const px = x(t.getTime());
+    svgContent += `<line x1="${px}" y1="${PAD_TOP-6}" x2="${px}" y2="${H-PAD_BOT+6}" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3,5"/>`;
+  }
+
+  const first = relevant[0];
+  const last = relevant[relevant.length-1];
+  let midExtremePt = null; // extremo central (si existe), para evitar que su etiqueta choque con la del marcador
+  relevant.forEach((e)=>{
+    const px = x(e.time.getTime()), py = y(heightAt(e.time, smoothed) ?? e.height);
+    const color = e.type==='high' ? 'var(--red)' : 'var(--green)';
+    svgContent += `<circle cx="${px}" cy="${py}" r="6" fill="${color}"/>`;
+    if(e!==first && e!==last){
+      midExtremePt = { px, py, e };
+    }
+  });
+  geom.midTime = midExtremePt ? midExtremePt.e.time : null;
+
+  // Punto marcador: el que se arrastra a mano (manualTime) o, si no se ha
+  // movido, el instante de referencia actual (reference), siempre que caiga
+  // dentro de la ventana visible.
+  const markerTime = (manualTime && manualTime>=winStart && manualTime<=winEnd) ? manualTime : reference;
+  let markerPt = null;
+  if(markerTime>=winStart && markerTime<=winEnd){
+    const h = heightAt(markerTime, series);
+    if(h!=null){
+      markerPt = { px: x(markerTime.getTime()), py: y(heightAt(markerTime, smoothed) ?? h), time: markerTime, height: h };
+    }
+  }
+  updateGauge(markerPt ? markerPt.height : null, hMin, hMax, windowHigh, windowLow);
+
+  // --- Anti-solapamiento: si la etiqueta central de marea y la del marcador
+  // caen muy cerca en horizontal, las separamos forzando cada una a un lado
+  // vertical distinto (arriba/abajo) en vez de decidirlo cada una por su cuenta.
+  let midAbove = midExtremePt ? (midExtremePt.e.type === 'high') : null;
+  let markerAbove = markerPt ? (markerPt.py/H) > 0.35 : null;
+  if(midExtremePt && markerPt){
+    const dx = Math.abs(midExtremePt.px - markerPt.px);
+    if(dx < W*0.24){
+      if(markerPt.py <= midExtremePt.py){ markerAbove = true; midAbove = false; }
+      else { markerAbove = false; midAbove = true; }
+    }
+  }
+
+  if(midExtremePt){
+    const { px, py, e } = midExtremePt;
+    const leftPct = (px/W*100).toFixed(1);
+    const offsetPx = midAbove ? -60 : 12;
+    midLabels.innerHTML += `<div class="mid-label ${e.type==='high'?'high':'low'}" style="left:${leftPct}%; top:${(py/H*100).toFixed(1)}%; transform:translate(-50%, ${offsetPx}px);">
+      <span class="time">${fmtTime(e.time)}</span>
+      <span class="label">${e.type==='high'?'Pleamar':'Bajamar'}</span>
+      <span class="height">${e.height.toFixed(2)}m</span>
+    </div>`;
+  }
+
+  if(markerPt){
+    const { px, py, time, height } = markerPt;
+    svgContent += `<line x1="${px}" y1="${PAD_TOP-6}" x2="${px}" y2="${H-PAD_BOT+6}" stroke="var(--white)" stroke-width="1" stroke-dasharray="2,4" opacity="0.6"/>`;
+    svgContent += `<circle id="markerDot" cx="${px}" cy="${py}" r="10" fill="var(--white)" stroke="var(--bg)" stroke-width="2"/>`;
+    dotPixel = { x: px, y: py };
+
+    const trend = trendAt(time, series);
+    const trendWord = trend === 'subiendo' ? 'Subiendo' : (trend === 'bajando' ? 'Bajando' : '');
+    const leftPct = (px/W*100).toFixed(1);
+    const offsetPx = markerAbove ? -56 : 14;
+    midLabels.innerHTML += `<div class="now-label" style="left:${leftPct}%; top:${(py/H*100).toFixed(1)}%; transform:translate(-50%, ${offsetPx}px);">
+      <span class="time">${fmtTime(time)}</span>
+      <span class="label">${trendWord}</span>
+      <span class="height">${height.toFixed(2)}m</span>
+    </div>`;
+  } else {
+    dotPixel = null;
+  }
+
+  svg.innerHTML = svgContent;
+
+  const firstEl = document.getElementById('firstExtreme');
+  const lastEl = document.getElementById('lastExtreme');
+  firstEl.className = 'extreme ' + (first.type==='high' ? 'high' : 'low');
+  lastEl.className = 'extreme right ' + (last.type==='high' ? 'high' : 'low');
+  firstEl.innerHTML =
+    `<div class="time">${fmtTime(first.time)}</div><div class="label">${first.type==='high'?'Pleamar':'Bajamar'}</div><div class="height">${first.height.toFixed(2)}m</div>`;
+  lastEl.innerHTML =
+    `<div class="time">${fmtTime(last.time)}</div><div class="label">${last.type==='high'?'Pleamar':'Bajamar'}</div><div class="height">${last.height.toFixed(2)}m</div>`;
+
+  for(let t=new Date(firstTick); t<=winEnd; t.setHours(t.getHours()+1)){
+    const span = document.createElement('span');
+    span.textContent = t.getHours();
+    hoursRow.appendChild(span);
+  }
+}
+
+// ---------------------------------------------------------------------
+// RENDER GENERAL
+// ---------------------------------------------------------------------
+function updateDisplay(){
+  const reference = currentRefTime();
+  const dayStart = new Date(reference); dayStart.setHours(0,0,0,0);
+
+  const series = cachedSeries;
+  if(!series) return;
+
+  drawCurve(series);
+
+  const rangeStr = geom ? `(${fmtTime(geom.winStart)} - ${fmtTime(geom.winEnd)})` : '';
+  document.getElementById('dateLine1').textContent = fmtDate(reference);
+  document.getElementById('dateLine2').textContent = rangeStr;
+
+  // El marcador (arrastrado a mano o el automático) también determina la
+  // temperatura del agua que se muestra, para que cambie igual que en la curva.
+  const markerTime = (manualTime && geom && manualTime>=geom.winStart && manualTime<=geom.winEnd) ? manualTime : reference;
+
+  const sun = sunTimesFor(dayStart, LAT, LON);
+  document.getElementById('sunTimes').textContent = fmtTime(sun.sunrise) + " → " + fmtTime(sun.sunset);
+  document.getElementById('daylightHours').textContent = fmtDuration(sun.sunrise, sun.sunset);
+  document.getElementById('nightHours').textContent = fmtNightDuration(sun.sunrise, sun.sunset);
+
+  const temp = tempAt(markerTime, cachedTempSeries);
+  document.getElementById('waterTemp').textContent = temp!=null ? `${temp.toFixed(1)}°C de agua` : "-- de agua";
+
+  const moon = moonInfo(reference);
+  document.getElementById('moonIcon').textContent = moon.icon;
+  document.getElementById('moonPhaseName').textContent = moon.name;
+  document.getElementById('springNeapIcon').textContent = moon.springNeap.icon;
+  document.getElementById('springNeapLabel').textContent = moon.springNeap.label;
+  document.getElementById('prevMoonEvent').textContent =
+    `Anterior: ${fmtMoonEventLabel(moon.prevEvent.type)}, ${fmtEventDateTime(moon.prevEvent.date)}`;
+  document.getElementById('nextMoonEvent').textContent =
+    `Próxima: ${fmtMoonEventLabel(moon.nextEvent.type)}, ${fmtEventDateTime(moon.nextEvent.date)}`;
+}
+
+async function render(){
+  const badge = document.getElementById('statusBadge');
+  if(!cachedSeries){
+    badge.textContent = "cargando…";
+    badge.style.display = "inline-block";
+    try{
+      await loadTideData();
+      if(dataSource === 'openmeteo'){
+        badge.textContent = "datos aproximados (Open-Meteo)";
+        badge.style.display = "inline-block";
+      } else if(dataSource === 'oficial'){
+        badge.textContent = "datos estimados (IHM)";
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+    }catch(err){
+      console.error(err);
+      badge.textContent = "sin conexión";
+      badge.style.display = "inline-block";
+      return;
+    }
+  }
+  updateDisplay();
+}
+
+// ---------------------------------------------------------------------
+// NAVEGACIÓN ±12h (botones) + ANIMACIÓN DE DESLIZAMIENTO
+// ---------------------------------------------------------------------
+const curveCardEl = document.querySelector('.curve-card');
+
+function navigate(deltaHours){
+  manualOffsetHours += deltaHours;
+  manualTime = null;
+  slideAnimation(deltaHours > 0 ? 'left' : 'right');
+}
+
+function slideAnimation(direction){
+  curveCardEl.classList.add('animating');
+  const outX = direction === 'left' ? '-6%' : '6%';
+  curveCardEl.style.transform = `translateX(${outX})`;
+  curveCardEl.style.opacity = '0';
+  setTimeout(()=>{
+    updateDisplay();
+    curveCardEl.classList.remove('animating');
+    curveCardEl.style.transform = `translateX(${direction === 'left' ? '6%' : '-6%'})`;
+    curveCardEl.style.opacity = '0';
+    requestAnimationFrame(()=>{
+      curveCardEl.classList.add('animating');
+      requestAnimationFrame(()=>{
+        curveCardEl.style.transform = 'translateX(0)';
+        curveCardEl.style.opacity = '1';
+      });
+    });
+  }, 180);
+}
+
+document.getElementById('prev24Btn').onclick = ()=> navigate(-24);
+document.getElementById('prevBtn').onclick = ()=> navigate(-12);
+document.getElementById('nextBtn').onclick = ()=> navigate(12);
+document.getElementById('next24Btn').onclick = ()=> navigate(24);
+document.getElementById('nowBtn').onclick = ()=>{ manualOffsetHours = 0; manualTime = null; updateDisplay(); };
+document.getElementById('themeCheckbox').addEventListener('change', ()=>{ updateDisplay(); }); // recolorea curva/puntos
+
+// ---------------------------------------------------------------------
+// GESTOS: arrastrar el punto marcador sobre la curva, o hacer swipe
+// horizontal en cualquier otro punto de la curva para navegar ±12h.
+// ---------------------------------------------------------------------
+const curveWrapEl = document.querySelector('.curve-wrap');
+let gesture = null; // { mode:'dot'|'swipe', startX, startY, lastX }
+const DOT_HIT_RADIUS = 28;
+const SWIPE_THRESHOLD = 60;
+
+curveWrapEl.addEventListener('pointerdown', (ev)=>{
+  const rect = curveWrapEl.getBoundingClientRect();
+  const localX = ev.clientX - rect.left;
+  const localY = ev.clientY - rect.top;
+  let mode = 'swipe';
+  if(dotPixel){
+    const dist = Math.hypot(localX - dotPixel.x, localY - dotPixel.y);
+    if(dist <= DOT_HIT_RADIUS) mode = 'dot';
+  }
+  gesture = { mode, startX: ev.clientX, startY: ev.clientY, lastX: ev.clientX };
+  curveWrapEl.setPointerCapture(ev.pointerId);
+});
+
+curveWrapEl.addEventListener('pointermove', (ev)=>{
+  if(!gesture) return;
+  gesture.lastX = ev.clientX;
+  if(gesture.mode === 'dot'){
+    if(!geom) return;
+    const rect = curveWrapEl.getBoundingClientRect();
+    const localX = Math.min(geom.W, Math.max(0, ev.clientX - rect.left));
+    let t = geom.xInv(localX);
+    if(t < geom.winStart) t = geom.winStart;
+    if(t > geom.winEnd) t = geom.winEnd;
+    manualTime = t;
+    requestAnimationFrame(updateDisplay);
+  } else {
+    const dx = ev.clientX - gesture.startX;
+    curveCardEl.style.transition = 'none';
+    curveCardEl.style.transform = `translateX(${dx}px)`;
+  }
+});
+
+function endGesture(ev){
+  if(!gesture) return;
+  if(gesture.mode === 'swipe'){
+    const dx = gesture.lastX - gesture.startX;
+    curveCardEl.style.transition = '';
+    if(Math.abs(dx) > SWIPE_THRESHOLD){
+      curveCardEl.style.transform = 'translateX(0)';
+      navigate(dx < 0 ? 12 : -12); // swipe a la izquierda = avanzar, a la derecha = retroceder
+    } else {
+      curveCardEl.classList.add('animating');
+      curveCardEl.style.transform = 'translateX(0)';
+      setTimeout(()=> curveCardEl.classList.remove('animating'), 220);
+    }
+  }
+  gesture = null;
+}
+curveWrapEl.addEventListener('pointerup', endGesture);
+curveWrapEl.addEventListener('pointercancel', endGesture);
+
+// ---------------------------------------------------------------------
+// GESTO: arrastrar verticalmente en CUALQUIER punto del panel del tanque
+// hace lo mismo que arrastrar el punto negro de la curva. Es puramente
+// relativo al TIEMPO (no a la altura): deslizar hacia arriba SIEMPRE avanza
+// hacia delante en el tiempo, y hacia abajo SIEMPRE retrocede — da igual que
+// eso lleve hacia una pleamar o una bajamar. El tanque simplemente refleja la
+// altura que corresponda a ese instante, subiendo y bajando de forma natural
+// según avanza/retrocede el marcador.
+// ---------------------------------------------------------------------
+const gaugePanelEl = document.querySelector('.panel.gauge');
+let gaugeGesture = null; // { lastY }
+
+function currentMarkerTime(){
+  return manualTime || currentRefTime();
+}
+
+gaugePanelEl.addEventListener('pointerdown', (ev)=>{
+  if(!geom) return;
+  gaugeGesture = { lastY: ev.clientY };
+  gaugePanelEl.setPointerCapture(ev.pointerId);
+});
+
+gaugePanelEl.addEventListener('pointermove', (ev)=>{
+  if(!gaugeGesture || !geom) return;
+  const dy = ev.clientY - gaugeGesture.lastY;
+  gaugeGesture.lastY = ev.clientY;
+  if(dy===0) return;
+
+  const rect = gaugePanelEl.getBoundingClientRect();
+  const windowMs = geom.winEnd.getTime() - geom.winStart.getTime();
+  // recorrer el panel entero de arriba a abajo equivale a recorrer toda la ventana visible de la curva
+  const deltaMs = -dy * windowMs / rect.height; // arriba (dy<0) => avanza en el tiempo
+
+  const mt = currentMarkerTime();
+  if(!mt) return;
+  let newTime = new Date(mt.getTime() + deltaMs);
+  // límite real: el rango de datos que tenemos cargado (no la ventana visible,
+  // que ahora sigue al marcador y avanza sola de forma fluida al llegar al borde)
+  const dataStart = geom.series[0].time, dataEnd = geom.series[geom.series.length-1].time;
+  if(newTime < dataStart) newTime = dataStart;
+  if(newTime > dataEnd) newTime = dataEnd;
+  manualTime = newTime;
+  requestAnimationFrame(updateDisplay);
+});
+
+function endGaugeGesture(){ gaugeGesture = null; }
+gaugePanelEl.addEventListener('pointerup', endGaugeGesture);
+gaugePanelEl.addEventListener('pointercancel', endGaugeGesture);
+
+render();
+setInterval(render, 60000);
+setInterval(()=>{ cachedSeries = null; cachedTempSeries = null; render(); }, 3*60*60*1000);
+
+let resizeTimer = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 150);
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
