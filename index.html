@@ -186,7 +186,7 @@
   </header>
 
   <div class="curve-card">
-    <div class="extremes-row">
+    <div class="extremes-row" id="extremesRowTop">
       <div class="extreme" id="firstExtreme">
         <div class="time">--:--</div>
         <div class="label">--</div>
@@ -202,6 +202,7 @@
       <svg id="curve"></svg>
       <div id="midLabels"></div>
     </div>
+    <div class="extremes-row" id="extremesRowBottom"></div>
     <div class="hours" id="hoursRow"></div>
   </div>
 
@@ -807,6 +808,14 @@ function drawCurve(series){
 
   const firstEl = document.getElementById('firstExtreme');
   const lastEl = document.getElementById('lastExtreme');
+  // Si los extremos laterales son bajamares, sus etiquetas van DEBAJO de la
+  // curva (junto al punto más bajo) en vez de encima. Como first y last son
+  // siempre del mismo tipo (los 3 extremos de la ventana alternan), basta con
+  // mirar el de 'first' para decidir la fila de ambos.
+  const targetRow = document.getElementById(first.type==='low' ? 'extremesRowBottom' : 'extremesRowTop');
+  targetRow.appendChild(firstEl);
+  targetRow.appendChild(lastEl);
+
   firstEl.className = 'extreme ' + (first.type==='high' ? 'high' : 'low');
   lastEl.className = 'extreme right ' + (last.type==='high' ? 'high' : 'low');
   firstEl.innerHTML =
