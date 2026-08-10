@@ -79,7 +79,7 @@
 
   .curve-card{
     background:var(--curve-card);
-    padding:4px 12px 2px 12px;
+    padding:2px 12px 1px 12px;
     position:relative;
     flex:0 1 34%; min-height:0;
     display:flex; flex-direction:column;
@@ -119,7 +119,7 @@
   .grid{flex:1 1 auto;display:flex;min-height:0;}
   .panel{padding:14px 18px;display:flex;flex-direction:column;justify-content:center;position:relative;min-height:0;overflow:hidden;}
   .panel.astro{background:var(--panel-astro);flex:1.5 1 0;}
-  .panel.gauge{background:var(--panel-now);flex:1 1 0;align-items:center;gap:8px;border-left:1px solid var(--line);touch-action:none;}
+  .panel.gauge{background:var(--panel-now);flex:1 1 0;align-items:center;gap:5px;border-left:1px solid var(--line);touch-action:none;}
   .panel, .grid{transition:background .35s ease, border-color .35s ease;}
 
   #gaugeSvg{width:96px;height:auto;display:block;max-height:100%;}
@@ -127,6 +127,11 @@
   .gauge-tank-wrap{position:relative;flex:0 0 auto;}
   .gauge-max{font-size:0.92rem;font-weight:800;color:var(--red);}
   .gauge-min{font-size:0.92rem;font-weight:800;color:var(--green);}
+  .gauge-hint{
+    font-size:0.72rem;line-height:1;color:var(--muted);text-align:center;
+    animation:gaugeHintPulse 2.6s ease-in-out infinite;
+  }
+  @keyframes gaugeHintPulse{0%,100%{opacity:.25;} 50%{opacity:.75;}}
   .gauge-current{
     position:absolute;left:50%;font-size:0.72rem;font-weight:800;color:var(--white);
     background:var(--bg-header);padding:1px 6px;border-radius:8px;white-space:nowrap;
@@ -230,6 +235,7 @@
     </div>
     <div class="panel gauge">
       <div class="gauge-max" id="gaugeMax">--m</div>
+      <div class="gauge-hint">⌃</div>
       <div class="gauge-tank-wrap">
         <svg id="gaugeSvg" viewBox="0 0 80 164" preserveAspectRatio="xMidYMid meet">
           <defs>
@@ -242,6 +248,7 @@
         </svg>
         <div class="gauge-current" id="gaugeCurrent">--m</div>
       </div>
+      <div class="gauge-hint">⌄</div>
       <div class="gauge-min" id="gaugeMin">--m</div>
     </div>
   </div>
@@ -658,17 +665,20 @@ function drawCurve(series){
   const W = Math.max(200, Math.round(wrapRect.width));
   const H = Math.max(80, Math.round(wrapRect.height));
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  const PAD_TOP = H*0.16, PAD_BOT = H*0.18;
+  const PAD_TOP = H*0.11, PAD_BOT = H*0.13;
 
   const extremes = detectExtremes(series);
   if(extremes.length < 2){ geom = null; return; } // sin datos suficientes, no dibujamos nada
 
-  // Ventana = exactamente 3 mareas consecutivas (2 altas+1 baja o 2 bajas+1 alta).
-  // Si se está arrastrando el marcador a mano, la ventana LO SIGUE (para que al
-  // salir por un borde, arrastrando, se avance de forma natural a la siguiente
-  // ventana en vez de quedarse atascado). Si no, se centra en la referencia de
-  // navegación normal (±12h/±24h por botón o el instante real actual).
-  const reference = manualTime || currentRefTime();
+  // Ventana = exactamente 3 mareas consecutivas (2 altas+1 baja o 2 bajas+1 alta),
+  // centrada en la referencia de navegación (±12h/±24h por botón, o el instante
+  // real actual). IMPORTANTE: NO depende del marcador arrastrado — si lo hiciera,
+  // la ventana se recalcularía en cuanto el marcador cruzase el extremo central
+  // (no solo al llegar al borde real), dando un salto/parpadeo en pleno arrastre
+  // por la curva. El gesto del tanque, que sí necesita poder "salir" de la
+  // ventana de forma continua, desplaza la navegación explícitamente (como con
+  // los botones ±12h) en vez de depender de este recálculo automático.
+  const reference = currentRefTime();
 
   let idx = 0;
   for(let i=0;i<extremes.length;i++){
@@ -730,7 +740,7 @@ function drawCurve(series){
   if(firstTick < winStart) firstTick.setHours(firstTick.getHours()+1);
   for(let t=new Date(firstTick); t<=winEnd; t.setHours(t.getHours()+1)){
     const px = x(t.getTime());
-    svgContent += `<line x1="${px}" y1="${PAD_TOP-6}" x2="${px}" y2="${H-PAD_BOT+6}" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3,5"/>`;
+    svgContent += `<line x1="${px}" y1="${PAD_TOP-14}" x2="${px}" y2="${H-PAD_BOT+14}" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3,5"/>`;
   }
 
   const first = relevant[0];
@@ -766,7 +776,7 @@ function drawCurve(series){
 
   if(markerPt){
     const { px, py, time, height } = markerPt;
-    svgContent += `<line x1="${px}" y1="${PAD_TOP-6}" x2="${px}" y2="${H-PAD_BOT+6}" stroke="var(--white)" stroke-width="1" stroke-dasharray="2,4" opacity="0.6"/>`;
+    svgContent += `<line x1="${px}" y1="${PAD_TOP-14}" x2="${px}" y2="${H-PAD_BOT+14}" stroke="var(--white)" stroke-width="1" stroke-dasharray="2,4" opacity="0.6"/>`;
     svgContent += `<circle id="markerDot" cx="${px}" cy="${py}" r="10" fill="var(--white)" stroke="var(--bg)" stroke-width="2"/>`;
     dotPixel = { x: px, y: py };
 
@@ -832,7 +842,11 @@ function drawCurve(series){
 // RENDER GENERAL
 // ---------------------------------------------------------------------
 function updateDisplay(){
-  const reference = currentRefTime();
+  // Misma referencia que usa drawCurve para elegir la ventana: si se está
+  // arrastrando el marcador a mano, TODO lo que depende del día (fecha, sol,
+  // luna) le sigue — antes solo lo hacía la ventana de la curva, y la fecha
+  // se quedaba congelada en el instante de navegación mientras arrastrabas.
+  const reference = manualTime || currentRefTime();
   const dayStart = new Date(reference); dayStart.setHours(0,0,0,0);
 
   const series = cachedSeries;
@@ -932,62 +946,37 @@ document.getElementById('nowBtn').onclick = ()=>{ manualOffsetHours = 0; manualT
 document.getElementById('themeCheckbox').addEventListener('change', ()=>{ updateDisplay(); }); // recolorea curva/puntos
 
 // ---------------------------------------------------------------------
-// GESTOS: arrastrar el punto marcador sobre la curva, o hacer swipe
-// horizontal en cualquier otro punto de la curva para navegar ±12h.
+// GESTO: arrastrar el punto marcador sobre la curva.
+// (El swipe horizontal para navegar ±12h se quitó: los botones de abajo ya
+// cubren esa función, y era redundante.)
 // ---------------------------------------------------------------------
 const curveWrapEl = document.querySelector('.curve-wrap');
-let gesture = null; // { mode:'dot'|'swipe', startX, startY, lastX }
+let gesture = null; // { startX, startY }
 const DOT_HIT_RADIUS = 28;
-const SWIPE_THRESHOLD = 60;
 
 curveWrapEl.addEventListener('pointerdown', (ev)=>{
   const rect = curveWrapEl.getBoundingClientRect();
   const localX = ev.clientX - rect.left;
   const localY = ev.clientY - rect.top;
-  let mode = 'swipe';
-  if(dotPixel){
-    const dist = Math.hypot(localX - dotPixel.x, localY - dotPixel.y);
-    if(dist <= DOT_HIT_RADIUS) mode = 'dot';
-  }
-  gesture = { mode, startX: ev.clientX, startY: ev.clientY, lastX: ev.clientX };
+  if(!dotPixel) return;
+  const dist = Math.hypot(localX - dotPixel.x, localY - dotPixel.y);
+  if(dist > DOT_HIT_RADIUS) return; // fuera del punto: no hacemos nada
+  gesture = true;
   curveWrapEl.setPointerCapture(ev.pointerId);
 });
 
 curveWrapEl.addEventListener('pointermove', (ev)=>{
-  if(!gesture) return;
-  gesture.lastX = ev.clientX;
-  if(gesture.mode === 'dot'){
-    if(!geom) return;
-    const rect = curveWrapEl.getBoundingClientRect();
-    const localX = Math.min(geom.W, Math.max(0, ev.clientX - rect.left));
-    let t = geom.xInv(localX);
-    if(t < geom.winStart) t = geom.winStart;
-    if(t > geom.winEnd) t = geom.winEnd;
-    manualTime = t;
-    requestAnimationFrame(updateDisplay);
-  } else {
-    const dx = ev.clientX - gesture.startX;
-    curveCardEl.style.transition = 'none';
-    curveCardEl.style.transform = `translateX(${dx}px)`;
-  }
+  if(!gesture || !geom) return;
+  const rect = curveWrapEl.getBoundingClientRect();
+  const localX = Math.min(geom.W, Math.max(0, ev.clientX - rect.left));
+  let t = geom.xInv(localX);
+  if(t < geom.winStart) t = geom.winStart;
+  if(t > geom.winEnd) t = geom.winEnd;
+  manualTime = t;
+  requestAnimationFrame(updateDisplay);
 });
 
-function endGesture(ev){
-  if(!gesture) return;
-  if(gesture.mode === 'swipe'){
-    const dx = gesture.lastX - gesture.startX;
-    curveCardEl.style.transition = '';
-    if(Math.abs(dx) > SWIPE_THRESHOLD){
-      curveCardEl.style.transform = 'translateX(0)';
-      navigate(dx < 0 ? 12 : -12); // swipe a la izquierda = avanzar, a la derecha = retroceder
-    } else {
-      curveCardEl.classList.add('animating');
-      curveCardEl.style.transform = 'translateX(0)';
-      setTimeout(()=> curveCardEl.classList.remove('animating'), 220);
-    }
-  }
-  gesture = null;
-}
+function endGesture(){ gesture = null; }
 curveWrapEl.addEventListener('pointerup', endGesture);
 curveWrapEl.addEventListener('pointercancel', endGesture);
 
@@ -1026,13 +1015,19 @@ gaugePanelEl.addEventListener('pointermove', (ev)=>{
 
   const mt = currentMarkerTime();
   if(!mt) return;
-  let newTime = new Date(mt.getTime() + deltaMs);
-  // límite real: el rango de datos que tenemos cargado (no la ventana visible,
-  // que ahora sigue al marcador y avanza sola de forma fluida al llegar al borde)
-  const dataStart = geom.series[0].time, dataEnd = geom.series[geom.series.length-1].time;
-  if(newTime < dataStart) newTime = dataStart;
-  if(newTime > dataEnd) newTime = dataEnd;
-  manualTime = newTime;
+  const newTime = new Date(mt.getTime() + deltaMs);
+
+  if(newTime > geom.winEnd){
+    // se sale por el borde derecho: avanzamos la navegación como con el botón
+    // +12h, para que la ventana se desplace y el gesto siga fluido
+    manualOffsetHours += 12;
+    manualTime = null; // se recalcula en la nueva ventana (sigue al instante real+offset)
+  } else if(newTime < geom.winStart){
+    manualOffsetHours -= 12;
+    manualTime = null;
+  } else {
+    manualTime = newTime;
+  }
   requestAnimationFrame(updateDisplay);
 });
 
@@ -1040,7 +1035,15 @@ function endGaugeGesture(){ gaugeGesture = null; }
 gaugePanelEl.addEventListener('pointerup', endGaugeGesture);
 gaugePanelEl.addEventListener('pointercancel', endGaugeGesture);
 
-render();
+// Se retrasa la primera llamada con un doble requestAnimationFrame: así se
+// garantiza que el navegador ya ha completado su primer cálculo de diseño
+// antes de medir el tamaño real de la curva (getBoundingClientRect). Sin
+// este margen, si los datos ya estaban en caché (respuesta casi instantánea),
+// el gráfico podía llegar a medirse ANTES de que el diseño estuviera listo,
+// dando un tamaño diminuto y coordenadas de arrastre que no correspondían
+// con lo que se veía en pantalla — hasta la primera interacción, que forzaba
+// un redibujado ya correcto (de ahí el "salto" al tocar).
+requestAnimationFrame(()=>requestAnimationFrame(render));
 setInterval(render, 60000);
 setInterval(()=>{ cachedSeries = null; cachedTempSeries = null; render(); }, 3*60*60*1000);
 
