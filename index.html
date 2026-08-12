@@ -128,10 +128,13 @@
   .gauge-max{font-size:0.92rem;font-weight:800;color:var(--red);}
   .gauge-min{font-size:0.92rem;font-weight:800;color:var(--green);}
   .gauge-hint{
-    font-size:0.72rem;line-height:1;color:var(--muted);text-align:center;
-    animation:gaugeHintPulse 2.6s ease-in-out infinite;
+    display:flex;flex-direction:column;align-items:center;gap:0;
+    color:var(--muted);
   }
-  @keyframes gaugeHintPulse{0%,100%{opacity:.25;} 50%{opacity:.75;}}
+  .gauge-hint span{font-size:1.15rem;font-weight:800;line-height:.65;margin:-2px 0;animation:gaugeHintPulse 1.8s ease-in-out infinite;}
+  .gauge-hint span:nth-child(2){animation-delay:.2s;}
+  .gauge-hint span:nth-child(3){animation-delay:.4s;}
+  @keyframes gaugeHintPulse{0%,100%{opacity:.15;} 50%{opacity:.9;}}
   .gauge-current{
     position:absolute;left:50%;font-size:0.72rem;font-weight:800;color:var(--white);
     background:var(--bg-header);padding:1px 6px;border-radius:8px;white-space:nowrap;
@@ -235,7 +238,7 @@
     </div>
     <div class="panel gauge">
       <div class="gauge-max" id="gaugeMax">--m</div>
-      <div class="gauge-hint">⌃</div>
+      <div class="gauge-hint"><span>⌃</span><span>⌃</span><span>⌃</span></div>
       <div class="gauge-tank-wrap">
         <svg id="gaugeSvg" viewBox="0 0 80 164" preserveAspectRatio="xMidYMid meet">
           <defs>
@@ -248,7 +251,7 @@
         </svg>
         <div class="gauge-current" id="gaugeCurrent">--m</div>
       </div>
-      <div class="gauge-hint">⌄</div>
+      <div class="gauge-hint"><span>⌄</span><span>⌄</span><span>⌄</span></div>
       <div class="gauge-min" id="gaugeMin">--m</div>
     </div>
   </div>
@@ -1015,19 +1018,22 @@ gaugePanelEl.addEventListener('pointermove', (ev)=>{
 
   const mt = currentMarkerTime();
   if(!mt) return;
-  const newTime = new Date(mt.getTime() + deltaMs);
+  let newTime = new Date(mt.getTime() + deltaMs);
+  const dataStart = geom.series[0].time, dataEnd = geom.series[geom.series.length-1].time;
+  if(newTime < dataStart) newTime = dataStart;
+  if(newTime > dataEnd) newTime = dataEnd;
 
-  if(newTime > geom.winEnd){
-    // se sale por el borde derecho: avanzamos la navegación como con el botón
-    // +12h, para que la ventana se desplace y el gesto siga fluido
-    manualOffsetHours += 12;
-    manualTime = null; // se recalcula en la nueva ventana (sigue al instante real+offset)
-  } else if(newTime < geom.winStart){
-    manualOffsetHours -= 12;
-    manualTime = null;
-  } else {
-    manualTime = newTime;
+  if(newTime > geom.winEnd || newTime < geom.winStart){
+    // Se sale de la ventana visible: hay que pasar a la ventana siguiente (o
+    // anterior), pero el marcador debe seguir apareciendo exactamente en
+    // 'newTime' (no saltar a otro punto). Para eso, la referencia de
+    // navegación (currentRefTime = ahora + manualOffsetHours) se ajusta para
+    // que apunte justo a 'newTime': así, al recalcular la ventana con esa
+    // referencia, la nueva ventana es la que de verdad contiene 'newTime',
+    // y el marcador no se mueve de sitio, solo cambia el encuadre alrededor.
+    manualOffsetHours = (newTime.getTime() - Date.now()) / 3600000;
   }
+  manualTime = newTime;
   requestAnimationFrame(updateDisplay);
 });
 
