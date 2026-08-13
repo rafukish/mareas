@@ -1,6 +1,6 @@
 {
-  "name": "Mareas Bilbao",
-  "short_name": "Mareas",
+  "name": "Las Mareas de Jone",
+  "short_name": "Mareas Jone",
   "description": "Predicción y estado actual de la marea en Bilbao",
   "start_url": "./index.html",
   "scope": "./",
