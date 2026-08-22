@@ -146,6 +146,17 @@
     background:var(--bg-header);padding:1px 6px;border-radius:8px;white-space:nowrap;
     transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
+  .gauge-trend-hint{
+    position:absolute;left:50%;transform:translate(-50%,0);
+    display:flex;gap:2px;font-size:0.62rem;font-weight:800;line-height:1;
+    color:var(--white);opacity:0.75;pointer-events:none;
+    animation:gaugeHintPulse 1.6s ease-in-out infinite;
+  }
+  .gauge-remaining{
+    flex:0 0 auto;font-size:0.68rem;font-weight:700;color:var(--muted);
+    text-align:center;white-space:nowrap;line-height:1.2;
+    visibility:hidden;
+  }
 
   .astro-line{display:flex;align-items:center;gap:9px;font-size:1.08rem;font-weight:700;margin-bottom:4px;}
   .astro-line .ico{font-size:1.1rem;}
@@ -246,6 +257,7 @@
       </div>
     </div>
     <div class="panel gauge">
+      <div class="gauge-remaining" id="gaugeRemainingTop">Faltan --</div>
       <div class="gauge-hint"><span>⌃</span><span>⌃</span><span>⌃</span></div>
       <div class="gauge-max" id="gaugeMax">--m</div>
       <div class="gauge-tank-wrap">
@@ -259,9 +271,11 @@
           </g>
         </svg>
         <div class="gauge-current" id="gaugeCurrent">--m</div>
+        <div class="gauge-trend-hint" id="gaugeTrendHint">⌃⌃⌃</div>
       </div>
       <div class="gauge-min" id="gaugeMin">--m</div>
       <div class="gauge-hint"><span>⌄</span><span>⌄</span><span>⌄</span></div>
+      <div class="gauge-remaining" id="gaugeRemainingBottom">Faltan --</div>
     </div>
   </div>
 
@@ -648,21 +662,32 @@ function fmtEventDateTime(d){
 // según la marea, en la MISMA escala (hMin/hMax) que usa la curva principal,
 // para que sea coherente con lo que se ve arriba.
 // ---------------------------------------------------------------------
-function updateGauge(height, hMin, hMax, windowHigh, windowLow){
+function updateGauge(height, windowHigh, windowLow, trend, nextExtreme){
   const fillEl = document.getElementById('gaugeFill');
   const currentEl = document.getElementById('gaugeCurrent');
+  const trendEl = document.getElementById('gaugeTrendHint');
   const maxEl = document.getElementById('gaugeMax');
   const minEl = document.getElementById('gaugeMin');
+  const remainTopEl = document.getElementById('gaugeRemainingTop');
+  const remainBottomEl = document.getElementById('gaugeRemainingBottom');
 
   maxEl.textContent = windowHigh!=null ? windowHigh.toFixed(2)+'m' : '--m';
   minEl.textContent = windowLow!=null ? windowLow.toFixed(2)+'m' : '--m';
 
-  if(height==null || hMin==null || hMax==null || hMax<=hMin){
+  if(height==null || windowHigh==null || windowLow==null || windowHigh<=windowLow){
     fillEl.setAttribute('d','');
     currentEl.style.display = 'none';
+    trendEl.style.display = 'none';
+    // visibility, no display: el hueco se queda reservado siempre (ver más abajo)
+    remainTopEl.style.visibility = 'hidden';
+    remainBottomEl.style.visibility = 'hidden';
     return;
   }
-  const frac = Math.max(0, Math.min(1, (height-hMin)/(hMax-hMin)));
+
+  // Escala real: el 0% y el 100% son la bajamar y la pleamar de verdad (antes
+  // se usaba el margen de ±0.3m que solo vale para encuadrar la curva, y por
+  // eso el tanque nunca llegaba a llenarse ni a vaciarse del todo).
+  const frac = Math.max(0, Math.min(1, (height-windowLow)/(windowHigh-windowLow)));
   const top = 6, bottom = 158, left = 6, right = 74; // coordenadas del tanque (viewBox 80x164)
   const waterY = bottom - frac*(bottom-top);
   const wave = 5; // altura de la cresta ondulada de la superficie
@@ -673,11 +698,48 @@ function updateGauge(height, hMin, hMax, windowHigh, windowLow){
     + `L${right},${bottom} L${left},${bottom} Z`;
   fillEl.setAttribute('d', d);
 
-  // La cifra actual flota justo sobre la línea de agua, dentro del propio tanque
-  // (así no compite por sitio con el máximo/mínimo, que van fuera, arriba y abajo).
+  // La cifra actual flota sobre la línea de agua, pero su POSICIÓN se limita
+  // para que nunca quede pegada a las esquinas redondeadas del tanque (ahí
+  // chocaba con el contorno y con la cifra de pleamar/bajamar de fuera) —
+  // el relleno real sí llega a tope, solo se ajusta dónde se lee la etiqueta.
+  const labelY = Math.min(bottom-16, Math.max(top+16, waterY));
   currentEl.style.display = 'block';
-  currentEl.style.top = (waterY/164*100).toFixed(1) + '%';
+  currentEl.style.top = (labelY/164*100).toFixed(1) + '%';
   currentEl.textContent = height.toFixed(2) + 'm';
+
+  // Flechitas de tendencia, ancladas justo debajo de la ETIQUETA (no de la
+  // línea de agua real) — así nunca se superponen a la cifra, esté donde esté.
+  if(trend === 'subiendo' || trend === 'bajando'){
+    trendEl.style.display = 'flex';
+    trendEl.style.top = (Math.min(bottom-8, labelY+20)/164*100).toFixed(1) + '%';
+    trendEl.textContent = trend === 'subiendo' ? '⌃⌃⌃⌃' : '⌄⌄⌄⌄';
+  } else {
+    trendEl.style.display = 'none';
+  }
+
+  // Cuánto falta para la próxima marea extrema: arriba del todo si lo que
+  // viene es una pleamar, abajo del todo si es una bajamar. Los DOS
+  // elementos existen siempre en el flujo (con visibility, no display), así
+  // el hueco queda reservado tanto si se usa como si no — así no hay salto
+  // de layout al cambiar de uno a otro ni al actualizar el texto.
+  if(nextExtreme){
+    const remaining = Math.abs(nextExtreme.height - height);
+    const text = remaining >= 1
+      ? `Faltan ${remaining.toFixed(2)}m`
+      : `Faltan ${Math.round(remaining*100)}cm`;
+    if(nextExtreme.type === 'high'){
+      remainTopEl.textContent = text;
+      remainTopEl.style.visibility = 'visible';
+      remainBottomEl.style.visibility = 'hidden';
+    } else {
+      remainBottomEl.textContent = text;
+      remainBottomEl.style.visibility = 'visible';
+      remainTopEl.style.visibility = 'hidden';
+    }
+  } else {
+    remainTopEl.style.visibility = 'hidden';
+    remainBottomEl.style.visibility = 'hidden';
+  }
 }
 
 function drawCurve(series){
@@ -795,7 +857,9 @@ function drawCurve(series){
       markerPt = { px: x(markerTime.getTime()), py: y(heightAt(markerTime, smoothed) ?? h), time: markerTime, height: h };
     }
   }
-  updateGauge(markerPt ? markerPt.height : null, hMin, hMax, windowHigh, windowLow);
+  const trendNow = markerPt ? trendAt(markerPt.time, series) : null;
+  const nextExtreme = markerPt ? relevant.find(e => e.time > markerPt.time) : null;
+  updateGauge(markerPt ? markerPt.height : null, windowHigh, windowLow, trendNow, nextExtreme);
 
   // La etiqueta del marcador "ahora" sigue flotando sobre la curva (eso no
   // cambia); ya no compite con ninguna etiqueta de marea, que ahora vive
