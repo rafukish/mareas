@@ -55,6 +55,32 @@ con lo que ha cambiado respecto a la anterior. Las versiones v0.x recogen
 todo el historial hasta que empezamos a llevar este changelog; v1.0 en
 adelante ya queda documentado entrega a entrega.
 
+### v1.3 — Caché del IHM por mes, no por horas
+Detectado que la caché de mareas oficiales (IHM) caducaba cada 3h, aunque
+las predicciones no cambian mientras siga cubierto el mes anterior/actual/
+siguiente que ya se pidió — eso provocaba esperas de red evitables al
+reabrir la app pasadas esas 3h. Ahora la caché del IHM es válida hasta que
+cambia el mes de verdad (puede durar semanas sin refrescarse). La caché de
+Open-Meteo (solo temperatura, y reserva si el IHM falla) pasa de 3h a 6h.
+
+### v1.2 — Ajustes del tanque: flechas, título y espacio reservado
+Las flechitas de tendencia ahora se anclan justo debajo de la etiqueta del
+nivel actual (no de la línea de agua real), así nunca se superponen aunque
+el tanque esté lleno o vacío del todo. Ahora son 4 en vez de 3, y quedan
+bien pegadas a la etiqueta. Añadido un título al cuadrante ("Subiendo" en
+rojo / "Bajando" en verde, mismo código de color que el resto de la app),
+colocado igual que el título de fecha del cuadrante atmosférico (fijo
+arriba, mismo tamaño de fuente). El aviso de cuánto falta para la próxima
+marea extrema pasa a ser un único texto fijo debajo del título (antes se
+movía arriba/abajo del tanque según pleamar o bajamar), con el mismo
+tamaño de fuente que el subtítulo de horas del cuadrante atmosférico.
+Tanque ligeramente achatado para que quepa todo bien. Quitadas las
+flechitas parpadeantes de dentro del tanque (redundantes con el título en
+mayúsculas). Añadida la amplitud de la marea bajo el indicador de
+vivas/muertas (el coeficiente se probó y se quitó: no aportaba, con la
+amplitud basta). Acortado el texto de la etiqueta "datos aprox.
+(Open-Meteo)" para que no desborde a dos líneas en pantallas estrechas.
+
 ### v1.1 — Tanque: llenado real, tendencia y aviso de próxima marea
 Corregido el bug por el que el tanque nunca llegaba a llenarse ni a
 vaciarse del todo (usaba por error el margen de encuadre de la curva en vez
