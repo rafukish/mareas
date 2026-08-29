@@ -58,8 +58,10 @@ async function fetchMonth(year, month){ // month: 1-12
 exports.handler = async function () {
   try {
     const now = new Date();
-    // mes anterior, actual y siguiente: cobertura de sobra para navegar ±12h/±24h
-    const months = [-1, 0, 1].map(offset => {
+    // mes anterior (navegación hacia atrás) + los 3 meses siguientes empezando
+    // por el actual (navegación hacia delante y la lista de mareas extremas
+    // de "próximos 3 meses" del panel de información)
+    const months = [-1, 0, 1, 2].map(offset => {
       const d = new Date(now.getFullYear(), now.getMonth()+offset, 1);
       return { year: d.getFullYear(), month: d.getMonth()+1 };
     });

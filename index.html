@@ -158,6 +158,48 @@
   .gauge-remaining{font-size:0.85rem;font-weight:600;color:var(--muted);white-space:nowrap;}
 
   .astro-line{display:flex;align-items:center;gap:9px;font-size:1.08rem;font-weight:700;margin-bottom:4px;}
+
+  .info-btn{
+    margin-left:2px;flex:0 0 auto;background:none;border:none;color:var(--muted);
+    font-size:1.05rem;line-height:1;padding:2px 4px;cursor:pointer;
+  }
+  .info-btn:active{opacity:0.6;}
+
+  .info-view{
+    display:none;flex:1 1 auto;min-height:0;flex-direction:column;
+    background:var(--panel-astro);transition:background .35s ease;
+  }
+  .info-header{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px 8px 16px;
+  }
+  .info-title{font-size:1.05rem;font-weight:800;}
+  .info-sub{font-size:0.78rem;font-weight:600;color:var(--muted);}
+  .info-close{
+    background:none;border:none;color:var(--muted);font-size:1.15rem;
+    line-height:1;padding:2px 8px;cursor:pointer;
+  }
+  .info-close:active{opacity:0.6;}
+  .info-lists{flex:1 1 auto;min-height:0;display:flex;overflow:hidden;}
+  .info-col{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:0 8px 10px 8px;}
+  .info-col:first-child{border-right:1px solid var(--line);}
+  .info-col-title{
+    flex:0 0 auto;font-size:0.8rem;font-weight:800;text-align:center;
+    text-transform:uppercase;letter-spacing:.03em;padding:4px 0 8px 0;
+  }
+  .info-col-title.high{color:var(--red);}
+  .info-col-title.low{color:var(--green);}
+  .info-list{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
+  .info-row{
+    display:flex;flex-direction:column;align-items:center;text-align:center;
+    padding:5px 4px;border-radius:8px;font-size:0.72rem;color:var(--muted);
+    line-height:1.35;
+  }
+  .info-row .info-height{font-size:0.9rem;font-weight:800;color:var(--white);}
+  .info-row.top{background:var(--bg-header);}
+  .info-row.top .info-height{font-size:1.1rem;}
+  .info-row.top.high .info-height{color:var(--red);}
+  .info-row.top.low .info-height{color:var(--green);}
   .astro-line .ico{font-size:1.1rem;}
   .astro-line.temp-group{margin-top:10px;}
   .astro-line.sun-group{margin-top:10px;}
@@ -180,10 +222,13 @@
   .navbar button:active{opacity:0.6;}
 
   .status-badge{
-    margin-top:14px;align-self:flex-start;font-size:0.68rem;color:var(--muted);
-    background:#00000022;padding:3px 9px;border-radius:8px;letter-spacing:.03em;
+    margin-top:14px;align-self:flex-start;font-size:0.68rem;font-weight:700;
+    padding:3px 9px;border-radius:8px;letter-spacing:.03em;
     display:none;
   }
+  .status-badge.src-oficial{background:#1f9e5c33;color:var(--green);}
+  .status-badge.src-openmeteo{background:#00000022;color:var(--muted);}
+  .status-badge.src-error{background:#e0524a33;color:var(--red);}
 </style>
 </head>
 <body>
@@ -237,14 +282,14 @@
     <button id="next24Btn"><span class="ico">⟫</span>+24h</button>
   </div>
 
-  <div class="grid">
+  <div class="grid" id="mainGrid">
     <div class="panel astro">
       <div class="panel-date-title" id="dateLabel">
         <div class="date-line1" id="dateLine1">--</div>
         <div class="date-line2" id="dateLine2">--</div>
       </div>
       <div class="astro-content">
-        <div class="astro-line springneap"><span class="ico" id="springNeapIcon">〰️</span><span id="springNeapLabel">--</span></div>
+        <div class="astro-line springneap"><span class="ico" id="springNeapIcon">〰️</span><span id="springNeapLabel">--</span><button class="info-btn" id="infoBtn" aria-label="Ver mareas extremas de los próximos 3 meses">ⓘ</button></div>
         <div class="daylight" id="tideAmplitude">Amplitud: --m</div>
         <div class="astro-line temp-group"><span class="ico">🌡️</span><span id="waterTemp">--°C de agua</span></div>
         <div class="astro-line sun-group"><span class="ico">☀️</span><span id="sunTimes">--:-- → --:--</span></div>
@@ -278,6 +323,23 @@
         </div>
         <div class="gauge-min" id="gaugeMin">--m</div>
         <div class="gauge-hint"><span>⌄</span><span>⌄</span><span>⌄</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-view" id="infoView">
+    <div class="info-header">
+      <div class="info-title">Mareas extremas <span class="info-sub">(próx. 3 meses)</span></div>
+      <button class="info-close" id="infoCloseBtn" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="info-lists">
+      <div class="info-col">
+        <div class="info-col-title high">Pleamares</div>
+        <div class="info-list" id="infoHighList"></div>
+      </div>
+      <div class="info-col">
+        <div class="info-col-title low">Bajamares</div>
+        <div class="info-list" id="infoLowList"></div>
       </div>
     </div>
   </div>
@@ -994,14 +1056,17 @@ async function render(){
   const badge = document.getElementById('statusBadge');
   if(!cachedSeries){
     badge.textContent = "cargando…";
+    badge.className = "status-badge src-openmeteo";
     badge.style.display = "inline-block";
     try{
       await loadTideData();
       if(dataSource === 'openmeteo'){
         badge.textContent = "datos aprox. (Open-Meteo)";
+        badge.className = "status-badge src-openmeteo";
         badge.style.display = "inline-block";
       } else if(dataSource === 'oficial'){
-        badge.textContent = "datos estimados (IHM)";
+        badge.textContent = "datos oficiales (IHM)";
+        badge.className = "status-badge src-oficial";
         badge.style.display = "inline-block";
       } else {
         badge.style.display = "none";
@@ -1009,6 +1074,7 @@ async function render(){
     }catch(err){
       console.error(err);
       badge.textContent = "sin conexión";
+      badge.className = "status-badge src-error";
       badge.style.display = "inline-block";
       return;
     }
@@ -1053,6 +1119,55 @@ document.getElementById('nextBtn').onclick = ()=> navigate(12);
 document.getElementById('next24Btn').onclick = ()=> navigate(24);
 document.getElementById('nowBtn').onclick = ()=>{ manualOffsetHours = 0; manualTime = null; updateDisplay(); };
 document.getElementById('themeCheckbox').addEventListener('change', ()=>{ updateDisplay(); }); // recolorea curva/puntos
+
+// ---------------------------------------------------------------------
+// PANEL DE INFORMACIÓN: mareas extremas de los próximos 3 meses. Sustituye
+// al cuadrante inferior (atmosférico + tanque) mientras está abierto.
+// ---------------------------------------------------------------------
+function renderInfoRow(e, isTop){
+  const div = document.createElement('div');
+  div.className = 'info-row' + (isTop ? ' top ' + e.type : '');
+  div.innerHTML = `<span>${fmtEventDateTime(e.time)}</span><span class="info-height">${e.height.toFixed(2)}m</span>`;
+  return div;
+}
+
+function populateInfoView(){
+  const highListEl = document.getElementById('infoHighList');
+  const lowListEl = document.getElementById('infoLowList');
+  highListEl.innerHTML = '';
+  lowListEl.innerHTML = '';
+
+  if(!cachedSeries || !cachedSeries.length || cachedSeries[0].type === undefined){
+    // sin datos con "type" propio (p.ej. reserva de Open-Meteo, serie horaria
+    // sin extremos ya identificados): no hay lista fiable que mostrar
+    highListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
+    lowListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
+    return;
+  }
+
+  const now = new Date();
+  const limit = new Date(now); limit.setMonth(limit.getMonth()+3);
+  const upcoming = cachedSeries.filter(e => e.time>=now && e.time<=limit);
+
+  const highs = upcoming.filter(e=>e.type==='high').sort((a,b)=>b.height-a.height).slice(0,6);
+  const lows = upcoming.filter(e=>e.type==='low').sort((a,b)=>a.height-b.height).slice(0,6);
+
+  if(highs.length===0) highListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
+  else highs.forEach((e,i)=> highListEl.appendChild(renderInfoRow(e, i===0)));
+
+  if(lows.length===0) lowListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
+  else lows.forEach((e,i)=> lowListEl.appendChild(renderInfoRow(e, i===0)));
+}
+
+document.getElementById('infoBtn').onclick = ()=>{
+  document.getElementById('mainGrid').style.display = 'none';
+  document.getElementById('infoView').style.display = 'flex';
+  populateInfoView();
+};
+document.getElementById('infoCloseBtn').onclick = ()=>{
+  document.getElementById('infoView').style.display = 'none';
+  document.getElementById('mainGrid').style.display = 'flex';
+};
 
 // ---------------------------------------------------------------------
 // GESTO: arrastrar el punto marcador sobre la curva.

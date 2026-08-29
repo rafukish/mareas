@@ -55,6 +55,19 @@ con lo que ha cambiado respecto a la anterior. Las versiones v0.x recogen
 todo el historial hasta que empezamos a llevar este changelog; v1.0 en
 adelante ya queda documentado entrega a entrega.
 
+### v1.4 — Pastilla de fuente con color dinámico, y panel de mareas extremas
+La pastilla de fuente de datos ahora cambia de color según de dónde vienen
+los datos: verde pastel para el IHM (nuevos o de caché), gris para
+Open-Meteo, rojo si no se puede obtener ninguno. Antes solo se mostraba en
+gris, y encima solo en los casos de reserva/error. Añadido un botón de
+información (ⓘ) junto al indicador de vivas/muertas: al pulsarlo, sustituye
+todo el cuadrante inferior por un panel con la lista de las pleamares y
+bajamares más extremas de los próximos 3 meses (la más extrema de cada
+lista, destacada), con un botón X para volver a los cuadrantes normales.
+La función de Netlify amplía su rango de meses pedidos al IHM (de 3 a 4:
+uno atrás + los 3 próximos) para poder alimentar esta lista con los mismos
+datos que ya usa el resto de la app.
+
 ### v1.3 — Caché del IHM por mes, no por horas
 Detectado que la caché de mareas oficiales (IHM) caducaba cada 3h, aunque
 las predicciones no cambian mientras siga cubierto el mes anterior/actual/
