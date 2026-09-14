@@ -55,6 +55,29 @@ con lo que ha cambiado respecto a la anterior. Las versiones v0.x recogen
 todo el historial hasta que empezamos a llevar este changelog; v1.0 en
 adelante ya queda documentado entrega a entrega.
 
+### v1.6 — Regresión de la caché del IHM corregida
+El motivo de la respuesta a tu pregunta: la caché del IHM por mes que
+arreglamos en la v1.3 se había perdido sin querer en una edición
+posterior (se sobrescribió esa función entera al añadir otra cosa, y
+volvió a quedar con la validación antigua por horas). Eso hacía que, pasadas
+esas horas, la app tuviera que volver a llamar de verdad a la función de
+Netlify (y esta al IHM) cada vez que se abría, con el retraso de unos
+segundos que se notaba tras el splash. Restaurada la validación por mes;
+confirmado con una prueba que la caché ya aguanta semanas sin refrescarse
+dentro del mismo mes.
+
+### v1.5 — Retoques de la lista, luna, iPhone y arrastre
+En el panel de mareas extremas: título y subtítulo centrados; el día
+actual, si aparece en la lista, se marca con un contorno fino; el orden
+pasa de "más extrema primero" a cronológico (la más extrema se sigue
+destacando, solo cambia el orden de la lista). El indicador de fase lunar
+ahora muestra la próxima luna llena y la próxima luna nueva (antes
+anterior/próxima), la que llegue primero arriba. Corregido un hueco en
+blanco en la parte inferior en iPhone (Safari en modo PWA instalada no
+siempre calcula bien `100dvh`; ahora la app se ancla directamente a los
+bordes reales de la pantalla). El punto negro ahora se puede arrastrar
+tocando cualquier punto de su línea vertical, no solo el punto en sí.
+
 ### v1.4 — Pastilla de fuente con color dinámico, y panel de mareas extremas
 La pastilla de fuente de datos ahora cambia de color según de dónde vienen
 los datos: verde pastel para el IHM (nuevos o de caché), gris para
