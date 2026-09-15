@@ -716,20 +716,19 @@ function moonInfo(date){
   return {
     name: phase.name,
     icon: phase.icon,
-    upcomingEvents,
-    springNeap: springNeapInfo(age)
+    upcomingEvents
   };
 }
 
-// Mareas vivas (springs) ocurren cerca de luna nueva/llena; mareas muertas
-// (neaps) cerca de los cuartos. cos(2·ángulo del ciclo lunar) da +1 en
-// nueva/llena y -1 en los cuartos, con transición suave entre medias.
-function springNeapInfo(ageDays){
-  const theta = (ageDays / SYNODIC_MONTH_DAYS) * 2 * Math.PI;
-  const index = Math.cos(2*theta); // -1 (muertas) .. +1 (vivas)
-  if(index > 0.5) return { label: "Mareas vivas", icon: "🌊" };
-  if(index < -0.5) return { label: "Mareas muertas", icon: "🌫️" };
-  return { label: "Mareas medias", icon: "〰️" };
+// Mareas vivas/medias/muertas según la amplitud REAL de la marea (la
+// diferencia entre la pleamar y la bajamar de la ventana visible), no según
+// la fase lunar (que era solo una aproximación).
+function springNeapInfo(amplitude){
+  if(amplitude == null) return { label: "--", icon: "〰️" };
+  if(amplitude > 3.75) return { label: "Mareas vivas +", icon: "🌊" };
+  if(amplitude > 2.90) return { label: "Mareas vivas", icon: "🌊" };
+  if(amplitude > 2.05) return { label: "Mareas medias", icon: "〰️" };
+  return { label: "Mareas muertas", icon: "🌫️" };
 }
 
 function fmtMoonEventLabel(type){ return type === 'full' ? 'llena' : 'nueva'; }
@@ -1057,16 +1056,20 @@ function updateDisplay(){
   const moon = moonInfo(reference);
   document.getElementById('moonIcon').textContent = moon.icon;
   document.getElementById('moonPhaseName').textContent = moon.name;
-  document.getElementById('springNeapIcon').textContent = moon.springNeap.icon;
-  document.getElementById('springNeapLabel').textContent = moon.springNeap.label;
 
-  // Amplitud de la marea en la ventana visible
+  // Amplitud de la marea en la ventana visible, y vivas/medias/muertas a
+  // partir de esa amplitud real (ya no de la fase lunar, que era solo una
+  // aproximación).
+  let amplitude = null;
   if(geom && geom.windowHigh!=null && geom.windowLow!=null){
-    const amplitude = geom.windowHigh - geom.windowLow;
+    amplitude = geom.windowHigh - geom.windowLow;
     document.getElementById('tideAmplitude').textContent = `Amplitud: ${amplitude.toFixed(2)}m`;
   } else {
     document.getElementById('tideAmplitude').textContent = 'Amplitud: --m';
   }
+  const springNeap = springNeapInfo(amplitude);
+  document.getElementById('springNeapIcon').textContent = springNeap.icon;
+  document.getElementById('springNeapLabel').textContent = springNeap.label;
 
   document.getElementById('moonEvent1').textContent =
     `Próxima ${fmtMoonEventLabel(moon.upcomingEvents[0].type)}, ${fmtEventDateTime(moon.upcomingEvents[0].date)}`;
@@ -1178,18 +1181,20 @@ function populateInfoView(){
   const highs = upcoming.filter(e=>e.type==='high').sort((a,b)=>b.height-a.height).slice(0,6);
   const lows = upcoming.filter(e=>e.type==='low').sort((a,b)=>a.height-b.height).slice(0,6);
 
-  // la más extrema de cada lista se determina ANTES de reordenar
-  // cronológicamente para mostrarlas (si no, se perdería cuál era la mayor)
-  const topHighTime = highs[0] ? highs[0].time.getTime() : null;
-  const topLowTime = lows[0] ? lows[0].time.getTime() : null;
+  // La(s) más extrema(s) de cada lista se determinan por VALOR (no por el
+  // instante de una sola), para que, si hay empate entre dos fechas
+  // distintas con la misma cifra, se marquen las dos — no solo la primera.
+  const topHighVal = highs.length ? Math.max(...highs.map(e=>e.height)) : null;
+  const topLowVal = lows.length ? Math.min(...lows.map(e=>e.height)) : null;
+  const TIE_EPSILON = 0.005; // margen para redondeos de coma flotante
   highs.sort((a,b)=>a.time-b.time);
   lows.sort((a,b)=>a.time-b.time);
 
   if(highs.length===0) highListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
-  else highs.forEach(e=> highListEl.appendChild(renderInfoRow(e, e.time.getTime()===topHighTime, e.time.toDateString()===todayStr)));
+  else highs.forEach(e=> highListEl.appendChild(renderInfoRow(e, topHighVal!=null && Math.abs(e.height-topHighVal)<TIE_EPSILON, e.time.toDateString()===todayStr)));
 
   if(lows.length===0) lowListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
-  else lows.forEach(e=> lowListEl.appendChild(renderInfoRow(e, e.time.getTime()===topLowTime, e.time.toDateString()===todayStr)));
+  else lows.forEach(e=> lowListEl.appendChild(renderInfoRow(e, topLowVal!=null && Math.abs(e.height-topLowVal)<TIE_EPSILON, e.time.toDateString()===todayStr)));
 }
 
 document.getElementById('infoBtn').onclick = ()=>{

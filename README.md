@@ -55,6 +55,15 @@ con lo que ha cambiado respecto a la anterior. Las versiones v0.x recogen
 todo el historial hasta que empezamos a llevar este changelog; v1.0 en
 adelante ya queda documentado entrega a entrega.
 
+### v1.7 — Vivas/muertas por amplitud real, y empates en mareas extremas
+El indicador de vivas/medias/muertas usaba la fase lunar como aproximación;
+ahora usa la amplitud real de la marea (la misma que ya se mostraba debajo)
+con los umbrales exactos: <2.05m muertas, 2.05–2.90m medias, 2.90–3.75m
+vivas, >3.75m vivas +. En el panel de mareas extremas, si dos fechas
+distintas empatan en la misma cifra máxima o mínima dentro de los próximos
+3 meses, ahora se destacan las dos (antes solo se marcaba una, por
+comparar por fecha en vez de por valor).
+
 ### v1.6 — Regresión de la caché del IHM corregida
 El motivo de la respuesta a tu pregunta: la caché del IHM por mes que
 arreglamos en la v1.3 se había perdido sin querer en una edición
