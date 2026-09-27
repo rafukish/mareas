@@ -55,6 +55,16 @@ con lo que ha cambiado respecto a la anterior. Las versiones v0.x recogen
 todo el historial hasta que empezamos a llevar este changelog; v1.0 en
 adelante ya queda documentado entrega a entrega.
 
+### v1.8 — Empates corregidos de verdad (comparación por valor redondeado)
+El arreglo de la v1.7 para los empates tenía un fallo: comparaba las
+alturas en crudo con un margen fijo de 0.005, pero el dato real tiene más
+decimales que los 2 que se muestran en pantalla — así que dos cifras que
+redondean igual podían diferir más que ese margen (y no marcarse), y dos
+que redondean distinto podían diferir menos (y marcarse igual, como pasó
+con 4.51m y 4.52m en la propia app). Ahora se compara directamente por el
+valor ya redondeado a 2 decimales, que es lo que el usuario ve. Comprobado
+con el caso exacto de la captura que lo señaló.
+
 ### v1.7 — Vivas/muertas por amplitud real, y empates en mareas extremas
 El indicador de vivas/medias/muertas usaba la fase lunar como aproximación;
 ahora usa la amplitud real de la marea (la misma que ya se mostraba debajo)

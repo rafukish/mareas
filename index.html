@@ -1181,20 +1181,23 @@ function populateInfoView(){
   const highs = upcoming.filter(e=>e.type==='high').sort((a,b)=>b.height-a.height).slice(0,6);
   const lows = upcoming.filter(e=>e.type==='low').sort((a,b)=>a.height-b.height).slice(0,6);
 
-  // La(s) más extrema(s) de cada lista se determinan por VALOR (no por el
-  // instante de una sola), para que, si hay empate entre dos fechas
-  // distintas con la misma cifra, se marquen las dos — no solo la primera.
-  const topHighVal = highs.length ? Math.max(...highs.map(e=>e.height)) : null;
-  const topLowVal = lows.length ? Math.min(...lows.map(e=>e.height)) : null;
-  const TIE_EPSILON = 0.005; // margen para redondeos de coma flotante
+  // La(s) más extrema(s) de cada lista se determinan por el valor YA
+  // REDONDEADO a 2 decimales (lo que de verdad se muestra en pantalla), no
+  // por la altura en crudo con un margen fijo — si no, dos fechas que
+  // redondean igual (p.ej. 0.52 y 0.52) pueden diferir más que ese margen
+  // por debajo y no detectarse como empate, y al revés, dos que redondean
+  // distinto (4.51 y 4.52) pueden diferir menos y marcarse como si lo fueran.
+  const round2 = h => Math.round(h*100)/100;
+  const topHighVal = highs.length ? Math.max(...highs.map(e=>round2(e.height))) : null;
+  const topLowVal = lows.length ? Math.min(...lows.map(e=>round2(e.height))) : null;
   highs.sort((a,b)=>a.time-b.time);
   lows.sort((a,b)=>a.time-b.time);
 
   if(highs.length===0) highListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
-  else highs.forEach(e=> highListEl.appendChild(renderInfoRow(e, topHighVal!=null && Math.abs(e.height-topHighVal)<TIE_EPSILON, e.time.toDateString()===todayStr)));
+  else highs.forEach(e=> highListEl.appendChild(renderInfoRow(e, topHighVal!=null && round2(e.height)===topHighVal, e.time.toDateString()===todayStr)));
 
   if(lows.length===0) lowListEl.innerHTML = '<div class="info-row">Sin datos disponibles</div>';
-  else lows.forEach(e=> lowListEl.appendChild(renderInfoRow(e, topLowVal!=null && Math.abs(e.height-topLowVal)<TIE_EPSILON, e.time.toDateString()===todayStr)));
+  else lows.forEach(e=> lowListEl.appendChild(renderInfoRow(e, topLowVal!=null && round2(e.height)===topLowVal, e.time.toDateString()===todayStr)));
 }
 
 document.getElementById('infoBtn').onclick = ()=>{
