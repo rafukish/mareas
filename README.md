@@ -55,6 +55,11 @@ con lo que ha cambiado respecto a la anterior. Las versiones v0.x recogen
 todo el historial hasta que empezamos a llevar este changelog; v1.0 en
 adelante ya queda documentado entrega a entrega.
 
+### v1.9 — Contorno del día actual más visible
+El contorno que marca el día actual en la lista de mareas extremas era
+demasiado fino (1px) y de un color muy pálido, apenas se distinguía. Ahora
+es de 2px y con un color más marcado.
+
 ### v1.8 — Empates corregidos de verdad (comparación por valor redondeado)
 El arreglo de la v1.7 para los empates tenía un fallo: comparaba las
 alturas en crudo con un margen fijo de 0.005, pero el dato real tiene más
